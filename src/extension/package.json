@@ -1,0 +1,23 @@
+{
+  "name": "promptpilot-extension",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite build --watch --mode development",
+    "build": "vite build",
+    "build:firefox": "vite build --mode firefox",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@crxjs/vite-plugin": "^2.0.0-beta.31",
+    "@types/chrome": "^0.0.288",
+    "typescript": "^5.4.5",
+    "vite": "^5.4.14",
+    "vite-plugin-top-level-await": "^1.6.0",
+    "vite-plugin-wasm": "^3.5.0"
+  },
+  "dependencies": {
+    "tiktoken": "^1.0.21"
+  }
+}

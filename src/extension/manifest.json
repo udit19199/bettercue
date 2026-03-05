@@ -3,9 +3,21 @@
   "name": "PromptPilot",
   "version": "0.1.0",
   "description": "Optimize and rewrite prompts for LLMs",
-  "action": { "default_popup": "popup.html", "default_title": "PromptPilot" },
-  "permissions": ["storage", "contextMenus", "scripting", "activeTab", "alarms"],
-  "host_permissions": ["https://api.openai.com/*"],
-  "background": { "service_worker": "background.js" },
+  "action": { "default_popup": "popup/popup.html", "default_title": "PromptPilot" },
+  "options_page": "options/options.html",
+  "permissions": ["storage", "contextMenus", "scripting", "activeTab", "alarms", "clipboardWrite"],
+  "host_permissions": [
+    "https://api.openai.com/*",
+    "https://api.anthropic.com/*",
+    "https://generativelanguage.googleapis.com/*"
+  ],
+  "background": { "service_worker": "background/background.ts", "type": "module" },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content/content.ts"],
+      "run_at": "document_idle"
+    }
+  ],
   "icons": { "48": "icons/icon48.png" }
 }

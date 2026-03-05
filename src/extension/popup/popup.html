@@ -1,46 +1,302 @@
 <!doctype html>
-<html>
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>PromptPilot</title>
     <style>
-      body{font-family:Inter,system-ui,Segoe UI,Arial;margin:0;padding:12px;width:360px}
-      header{display:flex;align-items:center;gap:8px}
-      h1{font-size:16px;margin:0}
-      textarea{width:100%;height:120px;margin-top:8px}
-      select,button{margin-top:8px}
-      #preview{white-space:pre-wrap;background:#f7f7fb;padding:8px;border-radius:6px;margin-top:8px}
+      *, *::before, *::after { box-sizing: border-box; }
+
+      :root {
+        --bg: #0f1117;
+        --surface: #1a1d27;
+        --border: #2a2d3d;
+        --accent: #6ee7b7;
+        --accent2: #60a5fa;
+        --text: #e2e8f0;
+        --text-muted: #7c85a2;
+        --danger: #f87171;
+        --radius: 8px;
+        --font: Inter, system-ui, "Segoe UI", Arial, sans-serif;
+      }
+
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--font);
+        font-size: 13px;
+        margin: 0;
+        padding: 14px;
+        width: 380px;
+      }
+
+      /* ── Header ── */
+      header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 14px;
+      }
+
+      .logo {
+        width: 32px;
+        height: 32px;
+        background: linear-gradient(135deg, var(--accent), var(--accent2));
+        border-radius: 8px;
+        flex-shrink: 0;
+        position: relative;
+        overflow: hidden;
+      }
+
+      /* subtle geometric accent inside logo */
+      .logo::after {
+        content: "";
+        position: absolute;
+        bottom: -6px;
+        right: -6px;
+        width: 20px;
+        height: 20px;
+        background: rgba(255,255,255,0.15);
+        border-radius: 50%;
+      }
+
+      .header-text { flex: 1; }
+      .header-text h1 { font-size: 15px; font-weight: 700; margin: 0; letter-spacing: -0.02em; }
+      .header-text p  { font-size: 11px; color: var(--text-muted); margin: 1px 0 0; }
+
+      .icon-btn {
+        background: none;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        color: var(--text-muted);
+        cursor: pointer;
+        font-size: 15px;
+        line-height: 1;
+        padding: 5px 7px;
+        transition: border-color 0.15s, color 0.15s;
+      }
+      .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+      /* ── Warning ── */
+      .warning {
+        background: rgba(248,113,113,0.08);
+        border: 1px solid rgba(248,113,113,0.3);
+        border-radius: 6px;
+        color: var(--danger);
+        font-size: 12px;
+        padding: 7px 10px;
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .warning a {
+        color: var(--danger);
+        cursor: pointer;
+        font-weight: 600;
+        text-decoration: underline;
+      }
+
+      /* ── Prompt textarea ── */
+      textarea {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        color: var(--text);
+        font-family: var(--font);
+        font-size: 13px;
+        height: 110px;
+        outline: none;
+        padding: 10px;
+        resize: vertical;
+        transition: border-color 0.15s;
+        width: 100%;
+      }
+      textarea:focus { border-color: var(--accent2); }
+      textarea::placeholder { color: var(--text-muted); }
+
+      /* ── Controls row ── */
+      .controls {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 8px;
+        margin-top: 8px;
+      }
+
+      .control-group label {
+        display: block;
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        margin-bottom: 4px;
+      }
+
+      select, input[type="text"] {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        color: var(--text);
+        font-family: var(--font);
+        font-size: 12px;
+        outline: none;
+        padding: 6px 8px;
+        transition: border-color 0.15s;
+        width: 100%;
+      }
+      select:focus, input:focus { border-color: var(--accent2); }
+
+      /* ── Token estimate ── */
+      .meta-row {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        margin-top: 6px;
+        font-size: 11px;
+        color: var(--text-muted);
+      }
+
+      /* ── Optimize button ── */
+      .optimize-btn {
+        background: linear-gradient(135deg, var(--accent), var(--accent2));
+        border: none;
+        border-radius: var(--radius);
+        color: #0f1117;
+        cursor: pointer;
+        font-family: var(--font);
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        margin-top: 10px;
+        padding: 10px;
+        transition: opacity 0.15s, transform 0.1s;
+        width: 100%;
+      }
+      .optimize-btn:hover   { opacity: 0.9; }
+      .optimize-btn:active  { transform: scale(0.99); }
+      .optimize-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+      /* ── Preview ── */
+      .preview-label {
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        margin: 12px 0 5px;
+      }
+
+      #preview {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        color: var(--text);
+        font-size: 13px;
+        line-height: 1.55;
+        min-height: 64px;
+        padding: 10px;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      #preview.error { border-color: var(--danger); color: var(--danger); }
+      #preview:empty::before { content: "Optimized prompt will appear here…"; color: var(--text-muted); }
+
+      /* ── Actions ── */
+      .actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-top: 8px;
+      }
+
+      .action-btn {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        color: var(--text);
+        cursor: pointer;
+        font-family: var(--font);
+        font-size: 12px;
+        font-weight: 500;
+        padding: 8px;
+        transition: border-color 0.15s, background 0.15s;
+      }
+      .action-btn:hover { border-color: var(--accent); }
     </style>
   </head>
   <body>
+    <!-- Header -->
     <header>
-      <div style="width:36px;height:36px;background:linear-gradient(135deg,#6ee7b7,#60a5fa);border-radius:8px"></div>
-      <h1>PromptPilot</h1>
+      <div class="logo"></div>
+      <div class="header-text">
+        <h1>PromptPilot</h1>
+        <p>Prompt optimizer</p>
+      </div>
+      <button class="icon-btn" id="settings" title="Settings">⚙</button>
     </header>
-    <div>
-      <label>Prompt</label>
-      <textarea id="prompt" placeholder="Paste or type your prompt"></textarea>
 
-      <div>
+    <!-- No-key warning (hidden by default) -->
+    <div class="warning" id="no-key-warning" hidden>
+      No API key saved.
+      <a id="open-settings-link">Open Settings</a> to add one.
+    </div>
+
+    <!-- Prompt input -->
+    <textarea id="prompt" placeholder="Paste or type your prompt here…"></textarea>
+
+    <!-- Controls -->
+    <div class="controls">
+      <div class="control-group">
         <label>Provider</label>
         <select id="provider">
-          <option value="mock">Mock</option>
           <option value="openai">OpenAI</option>
+          <option value="anthropic">Anthropic</option>
+          <option value="google">Google</option>
+          <option value="mock">Mock (offline)</option>
         </select>
-        <label>Model</label>
-        <input id="model" value="gpt-4o" />
       </div>
-
-      <button id="optimize">Optimize</button>
-
-      <div id="preview"></div>
-      <div style="display:flex;gap:8px;margin-top:8px">
-        <button id="copy">Copy</button>
-        <button id="replace">Replace Selection</button>
+      <div class="control-group">
+        <label>Model</label>
+        <input type="text" id="model" value="gpt-4o" spellcheck="false" />
+      </div>
+      <div class="control-group">
+        <label>Preset</label>
+        <select id="preset">
+          <option value="concise">Concise</option>
+          <option value="precision">Precision</option>
+          <option value="creative">Creative</option>
+        </select>
       </div>
     </div>
 
-    <script src="popup.js"></script>
+    <!-- Token estimate -->
+    <div class="meta-row">
+      <span id="token-est">~0 tokens</span>
+    </div>
+
+    <!-- Optimize -->
+    <button class="optimize-btn" id="optimize">Optimize Prompt</button>
+
+    <!-- Preview -->
+    <p class="preview-label">Result</p>
+    <div id="preview"></div>
+
+    <!-- Action buttons -->
+    <div class="actions">
+      <button class="action-btn" id="copy">Copy</button>
+      <button class="action-btn" id="replace">Replace Selection</button>
+    </div>
+
+    <script src="./popup.ts" type="module"></script>
+
+    <script>
+      // Wire the inline settings link (can't easily do in module script)
+      document.getElementById("open-settings-link")?.addEventListener("click", () => {
+        chrome.runtime.openOptionsPage();
+      });
+    </script>
   </body>
 </html>
