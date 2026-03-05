@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "PromptPilot",
+  "version": "0.1.0",
+  "description": "Optimize and rewrite prompts for LLMs",
+  "action": { "default_popup": "popup.html", "default_title": "PromptPilot" },
+  "permissions": ["storage", "contextMenus", "scripting", "activeTab", "alarms"],
+  "host_permissions": ["https://api.openai.com/*"],
+  "background": { "service_worker": "background.js" },
+  "icons": { "48": "icons/icon48.png" }
+}
