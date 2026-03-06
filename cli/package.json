@@ -1,0 +1,20 @@
+{
+    "name": "@bettercue/cli",
+    "version": "0.1.0",
+    "module": "cli.ts",
+    "type": "module",
+    "private": true,
+    "bin": {
+        "better-cue": "cli.ts"
+    },
+    "devDependencies": {
+        "@types/bun": "latest"
+    },
+    "peerDependencies": {
+        "typescript": "^5"
+    },
+    "dependencies": {
+        "chalk": "^5.6.2",
+        "inquirer": "^12.10.0"
+    }
+}

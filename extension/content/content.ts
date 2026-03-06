@@ -2,12 +2,12 @@
  * Content script — injected into every page by the manifest.
  *
  * Responsibilities:
- *  1. Listen for the `promptpilot-selection` custom event dispatched by the
+ *  1. Listen for the `bettercue-selection` custom event dispatched by the
  *     background service worker (via chrome.scripting.executeScript) when the
  *     user right-clicks selected text and chooses "Optimize prompt".
  *     Forwards the selected text to the extension popup via a runtime message.
  *
- *  2. Expose a `promptpilot-replace` listener so the popup can ask the content
+ *  2. Expose a `bettercue-replace` listener so the popup can ask the content
  *     script to replace the currently focused input/textarea value without
  *     needing scripting permissions for every individual page action.
  *
@@ -16,7 +16,7 @@
 
 // ── 1. Receive selected text from background and forward to popup ─────────────
 
-window.addEventListener("promptpilot-selection", (event: Event) => {
+window.addEventListener("bettercue-selection", (event: Event) => {
   const text = (event as CustomEvent<string>).detail;
   if (!text) return;
   // The popup listens for this message type to pre-fill the prompt textarea.

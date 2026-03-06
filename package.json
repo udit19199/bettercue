@@ -1,19 +1,12 @@
 {
-    "name": "better-gpt",
-    "module": "index.ts",
-    "type": "module",
+    "name": "better-cue",
     "private": true,
-    "bin": {
-        "better-gpt": "cli.ts"
-    },
-    "devDependencies": {
-        "@types/bun": "latest"
-    },
-    "peerDependencies": {
-        "typescript": "^5"
-    },
-    "dependencies": {
-        "chalk": "^5.6.2",
-        "inquirer": "^12.10.0"
+    "workspaces": ["cli", "extension"],
+    "scripts": {
+        "cli":               "bun run --cwd cli cli.ts",
+        "extension:dev":     "bun run --cwd extension dev",
+        "extension:build":   "bun run --cwd extension build",
+        "extension:firefox": "bun run --cwd extension build:firefox",
+        "typecheck":         "bun run --cwd cli tsc --noEmit && bun run --cwd extension typecheck"
     }
 }

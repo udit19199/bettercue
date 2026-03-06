@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "PromptPilot",
+  "name": "BetterCue",
   "version": "0.1.0",
   "description": "Optimize and rewrite prompts for LLMs",
-  "action": { "default_popup": "popup/popup.html", "default_title": "PromptPilot" },
+  "action": { "default_popup": "popup/popup.html", "default_title": "BetterCue" },
   "options_page": "options/options.html",
   "permissions": ["storage", "contextMenus", "scripting", "activeTab", "alarms", "clipboardWrite"],
   "host_permissions": [

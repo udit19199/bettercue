@@ -144,6 +144,17 @@ const openaiAdapter: ProviderAdapter = {
 
     return result;
   },
+  listModels: async (apiKey: string | null) => {
+    if (!apiKey) return [];
+    const res = await fetch("https://api.openai.com/v1/models", {
+      method: "GET",
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    if (!Array.isArray(data?.data)) return [];
+    return data.data.map((m: any) => m.id).filter(Boolean);
+  },
 };
 
 export default openaiAdapter;

@@ -4,7 +4,8 @@ import { loadKey, loadLastUsedModel, saveLastUsedModel, loadPreciseTokensSetting
 
 const promptEl      = document.getElementById("prompt")   as HTMLTextAreaElement;
 const providerEl    = document.getElementById("provider") as HTMLSelectElement;
-const modelEl       = document.getElementById("model")    as HTMLInputElement;
+// modelEl may be a text input or a select depending on UI state
+const modelEl       = document.getElementById("model")    as HTMLInputElement | HTMLSelectElement;
 const presetEl      = document.getElementById("preset")   as HTMLSelectElement;
 const optimizeBtn   = document.getElementById("optimize") as HTMLButtonElement;
 const previewEl     = document.getElementById("preview")  as HTMLDivElement;
@@ -28,7 +29,8 @@ const DEFAULT_MODELS: Record<string, string> = {
 async function init() {
   const provider = providerEl.value as ProviderId;
   const lastModel = await loadLastUsedModel(provider);
-  modelEl.value = lastModel ?? DEFAULT_MODELS[provider] ?? "";
+  // populate model control (may fetch list)
+  await populateModelControl(provider, lastModel ?? DEFAULT_MODELS[provider] ?? "");
   await checkKey(provider);
 
   // populate token estimate for current input
@@ -49,7 +51,7 @@ async function checkKey(provider: ProviderId) {
 providerEl.addEventListener("change", async () => {
   const provider = providerEl.value as ProviderId;
   const lastModel = await loadLastUsedModel(provider);
-  modelEl.value = lastModel ?? DEFAULT_MODELS[provider] ?? "";
+  await populateModelControl(provider, lastModel ?? DEFAULT_MODELS[provider] ?? "");
   await checkKey(provider);
 });
 
@@ -73,7 +75,7 @@ optimizeBtn.addEventListener("click", async () => {
   if (!original) return;
 
   const provider = providerEl.value as ProviderId;
-  const model    = modelEl.value || DEFAULT_MODELS[provider];
+  const model    = (modelEl as HTMLInputElement).value || (modelEl as HTMLSelectElement).value || DEFAULT_MODELS[provider];
   const preset   = presetEl.value;
 
   // Load the stored API key (null for mock)
@@ -174,6 +176,11 @@ settingsBtn.addEventListener("click", () => {
   chrome.runtime.openOptionsPage();
 });
 
+// Also wire the inline warning link that opens settings
+document.getElementById("open-settings-link")?.addEventListener("click", () => {
+  chrome.runtime.openOptionsPage();
+});
+
 // ─── Receive selection from content script ────────────────────────────────────
 
 chrome.runtime.onMessage.addListener((message) => {
@@ -186,3 +193,76 @@ chrome.runtime.onMessage.addListener((message) => {
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 
 init();
+
+// ─── Model list fetching & UI population ───────────────────────────────────────
+
+async function populateModelControl(provider: ProviderId, desiredModel: string) {
+  // Try to read cached models
+  const cacheKey = `models.${provider}`;
+  const cached = await new Promise<any>((res) => chrome.storage.local.get([cacheKey], (r) => res(r[cacheKey] ?? null)));
+  const now = Date.now();
+
+  let models: string[] | null = null;
+  if (cached && cached.items && cached.fetchedAt && now - cached.fetchedAt < 1000 * 60 * 60) {
+    models = cached.items;
+  } else {
+    // ask background to list models
+    models = await new Promise<string[]>((res) => {
+      chrome.runtime.sendMessage({ type: "list-models", payload: { provider } }, (resp) => {
+        if (resp?.ok && Array.isArray(resp.models)) return res(resp.models);
+        return res([]);
+      });
+    });
+  }
+
+  const container = modelEl.parentElement;
+  if (!container) return;
+
+  // If models found, replace text input with a select
+  if (models && models.length > 0) {
+    const select = document.createElement("select");
+    select.id = "model";
+    for (const m of models) {
+      const opt = document.createElement("option");
+      opt.value = m;
+      opt.textContent = m;
+      select.appendChild(opt);
+    }
+    const customOpt = document.createElement("option");
+    customOpt.value = "__custom__";
+    customOpt.textContent = "Custom…";
+    select.appendChild(customOpt);
+
+    // preserve previous value if present
+    if (desiredModel && models.includes(desiredModel)) select.value = desiredModel;
+
+    // swap in DOM
+    container.replaceChild(select, modelEl);
+    // update ref
+    (modelEl as any) = select;
+
+    select.addEventListener("change", () => {
+      if (select.value === "__custom__") {
+        // swap back to input
+        const input = document.createElement("input");
+        input.type = "text";
+        input.id = "model";
+        input.spellcheck = false;
+        container.replaceChild(input, select);
+        (modelEl as any) = input;
+        input.value = desiredModel;
+      }
+    });
+  } else {
+    // ensure it's an input
+    if ((modelEl as HTMLInputElement).tagName !== "INPUT") {
+      const input = document.createElement("input");
+      input.type = "text";
+      input.id = "model";
+      input.spellcheck = false;
+      container.replaceChild(input, modelEl);
+      (modelEl as any) = input;
+    }
+    (modelEl as HTMLInputElement).value = desiredModel;
+  }
+}

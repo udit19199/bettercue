@@ -13,8 +13,8 @@ coverage
 
 # logs
 logs
-_.log
-report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
+*.log
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
 # dotenv environment variable files
 .env
@@ -27,9 +27,13 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 .eslintcache
 .cache
 *.tsbuildinfo
+.vite
+.bun-cache
 
-# IntelliJ based IDEs
+# editor config
+.vscode
 .idea
 
-# Finder (MacOS) folder config
+# OS files
 .DS_Store
+Thumbs.db

@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>PromptPilot</title>
+    <title>BetterCue</title>
     <style>
       *, *::before, *::after { box-sizing: border-box; }
 
@@ -232,7 +232,7 @@
     <header>
       <div class="logo"></div>
       <div class="header-text">
-        <h1>PromptPilot</h1>
+        <h1>BetterCue</h1>
         <p>Prompt optimizer</p>
       </div>
       <button class="icon-btn" id="settings" title="Settings">⚙</button>
@@ -291,12 +291,5 @@
     </div>
 
     <script src="./popup.ts" type="module"></script>
-
-    <script>
-      // Wire the inline settings link (can't easily do in module script)
-      document.getElementById("open-settings-link")?.addEventListener("click", () => {
-        chrome.runtime.openOptionsPage();
-      });
-    </script>
   </body>
 </html>

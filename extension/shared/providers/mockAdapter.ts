@@ -19,6 +19,9 @@ const mockAdapter: ProviderAdapter = {
     };
     return result;
   },
+  listModels: async (_apiKey: string | null) => {
+    return ["mock-model", "mock-model-large"];
+  },
 };
 
 export default mockAdapter;

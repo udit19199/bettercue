@@ -23,4 +23,6 @@ export interface ProviderAdapter {
     apiKey: string | null,
     options?: RewriteOptions
   ): Promise<RewriteResult>;
+  /** Optional: fetch a list of available model ids for this provider. */
+  listModels?: (apiKey: string | null) => Promise<string[]>;
 }
