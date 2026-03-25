@@ -3,7 +3,9 @@
 // The storage schema lives entirely under the "providers" key so it is
 // easy to wipe in one call via clearAllKeys().
 
-export type ProviderId = "openai" | "anthropic" | "google" | "mock";
+import type { CoreProviderId } from "@shared/providers";
+
+export type ProviderId = CoreProviderId | "mock";
 
 export type ProviderStorageEntry = {
   apiKey: string | null;

@@ -7,7 +7,7 @@ Guidance for agentic coding agents operating in this repository.
 ## Repository layout
 
 ```
-better-cue/  (formerly better-gpt)
+bettercue/
 ├── package.json          ← Bun workspace root
 ├── bun.lock              ← single unified lockfile
 ├── cli/                  ← @bettercue/cli  (Bun runtime, no compile step)

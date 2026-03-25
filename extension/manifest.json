@@ -1,12 +1,14 @@
 {
   "manifest_version": 3,
-  "name": "BetterCue",
+  "name": "bettercue",
   "version": "0.1.0",
   "description": "Optimize and rewrite prompts for LLMs",
-  "action": { "default_popup": "popup/popup.html", "default_title": "BetterCue" },
+  "action": { "default_popup": "popup/popup.html", "default_title": "bettercue" },
   "options_page": "options/options.html",
   "permissions": ["storage", "contextMenus", "scripting", "activeTab", "alarms", "clipboardWrite"],
   "host_permissions": [
+    "http://localhost:11434/*",
+    "http://127.0.0.1:11434/*",
     "https://api.openai.com/*",
     "https://api.anthropic.com/*",
     "https://generativelanguage.googleapis.com/*"

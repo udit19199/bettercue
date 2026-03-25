@@ -5,7 +5,7 @@ import topLevelAwait from "vite-plugin-top-level-await";
 import { resolve } from "path";
 import manifest from "./manifest.json";
 
-// ─── Vite config for the BetterCue browser extension ───────────────────────
+// ─── Vite config for the bettercue browser extension ───────────────────────
 //
 // Build outputs:
 //   dist/           Chrome / Edge (MV3) — loadable via chrome://extensions
@@ -46,7 +46,7 @@ export default defineConfig(({ mode }) => {
 
     resolve: {
       alias: {
-        "@shared": resolve(__dirname, "shared"),
+        "@shared": resolve(__dirname, "../shared"),
       },
     },
 

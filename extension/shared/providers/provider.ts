@@ -1,6 +1,7 @@
 export type RewriteOptions = {
   preset?: "concise" | "precision" | "creative" | string;
   maxTokens?: number;
+  baseUrl?: string;
   /** When true, the adapter may lazily load tiktoken for precise token counting. */
   preciseTokens?: boolean;
 };

@@ -1,4 +1,4 @@
-# better-cue (formerly better-gpt)
+# bettercue
 
 A monorepo containing two packages:
 
@@ -13,6 +13,11 @@ Install all dependencies from the root (single `bun install` covers both package
 bun install
 ```
 
+## Requirements
+
+- Bun
+- Ollama running locally at `http://localhost:11434` for the CLI and the Ollama provider in the extension
+
 ## Usage
 
 ### CLI
@@ -20,6 +25,12 @@ bun install
 ```bash
 bun run cli
 ```
+
+The CLI opens a small terminal wizard:
+- enter a prompt
+- choose a local Ollama model
+- review the rewritten prompt in the console
+- the process exits once the optimized prompt is printed
 
 ### Extension
 
@@ -33,6 +44,9 @@ bun run extension:build
 # Production build (Firefox)
 bun run extension:firefox
 ```
+
+In the extension popup, choose a provider and model, then rewrite the prompt.
+Ollama is available as a first-class provider and does not require an API key.
 
 ### Typecheck all packages
 

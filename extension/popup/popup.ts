@@ -1,4 +1,5 @@
 import { loadKey, loadLastUsedModel, saveLastUsedModel, loadPreciseTokensSetting, type ProviderId } from "../shared/storage/keys";
+import { CORE_PROVIDERS } from "@shared/providers";
 
 // ─── DOM refs ─────────────────────────────────────────────────────────────────
 
@@ -18,11 +19,16 @@ const noKeyWarning  = document.getElementById("no-key-warning") as HTMLDivElemen
 // ─── Defaults per provider ────────────────────────────────────────────────────
 
 const DEFAULT_MODELS: Record<string, string> = {
-  openai:    "gpt-4o",
-  anthropic: "claude-3-5-sonnet-20241022",
-  google:    "gemini-2.0-flash",
+  openai:    CORE_PROVIDERS.openai.defaultModel,
+  anthropic: CORE_PROVIDERS.anthropic.defaultModel,
+  google:    CORE_PROVIDERS.google.defaultModel,
   mock:      "mock-model",
+  ollama:    CORE_PROVIDERS.ollama.defaultModel,
 };
+
+function needsApiKey(provider: ProviderId): boolean {
+  return provider !== "mock" && provider !== "ollama";
+}
 
 // ─── Init: restore last-used model and check key ─────────────────────────────
 
@@ -38,7 +44,7 @@ async function init() {
 }
 
 async function checkKey(provider: ProviderId) {
-  if (provider === "mock") {
+  if (!needsApiKey(provider)) {
     noKeyWarning.hidden = true;
     return;
   }
@@ -79,9 +85,9 @@ optimizeBtn.addEventListener("click", async () => {
   const preset   = presetEl.value;
 
   // Load the stored API key (null for mock)
-  const apiKey = provider === "mock" ? null : await loadKey(provider);
+  const apiKey = needsApiKey(provider) ? await loadKey(provider) : null;
 
-  if (provider !== "mock" && !apiKey) {
+  if (needsApiKey(provider) && !apiKey) {
     previewEl.textContent = "No API key found. Open Settings to add one.";
     previewEl.classList.add("error");
     return;
