@@ -4,6 +4,8 @@
     "workspaces": ["cli", "extension"],
     "scripts": {
         "cli":               "bun run --cwd cli cli.ts",
+        "build:cli:macos":   "mkdir -p dist && bun build --compile --target=bun-darwin-arm64 --outfile dist/bettercue-macos-arm64 ./cli/cli.ts",
+        "package:cli:macos": "bun run build:cli:macos && tar -czf dist/bettercue-macos-arm64.tar.gz -C dist bettercue-macos-arm64 && shasum -a 256 dist/bettercue-macos-arm64.tar.gz > dist/bettercue-macos-arm64.tar.gz.sha256",
         "extension:dev":     "bun run --cwd extension dev",
         "extension:build":   "bun run --cwd extension build",
         "extension:firefox": "bun run --cwd extension build:firefox",

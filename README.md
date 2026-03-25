@@ -28,9 +28,37 @@ bun run cli
 
 The CLI opens a small terminal wizard:
 - enter a prompt
-- choose a local Ollama model
+- choose a provider and model
 - review the rewritten prompt in the console
 - the process exits once the optimized prompt is printed
+
+#### macOS standalone binary (no Bun required on user machines)
+
+Build and package:
+
+```bash
+bun run package:cli:macos
+```
+
+Artifacts are created in `dist/`:
+
+- `dist/bettercue-macos-arm64`
+- `dist/bettercue-macos-arm64.tar.gz`
+- `dist/bettercue-macos-arm64.tar.gz.sha256`
+
+On a macOS user machine:
+
+```bash
+tar -xzf bettercue-macos-arm64.tar.gz
+chmod +x bettercue-macos-arm64
+./bettercue-macos-arm64
+```
+
+API keys for hosted providers can be stored in macOS Keychain:
+
+```bash
+./bettercue-macos-arm64 auth
+```
 
 ### Extension
 
