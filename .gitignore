@@ -1,39 +1,67 @@
-# dependencies (bun install)
-node_modules
+# Dependencies
+node_modules/
 
-# output
-out
-dist
-dist-firefox
+# Output & Build Artifacts
+out/
+dist/
+dist-firefox/
+build/
+.output/
+.nuxt/
 *.tgz
+*.zip
 
-# code coverage
-coverage
+# Caches & Tooling
+.vite/
+.bun-cache/
+.cache/
+.eslintcache
+.prettiercache
+.stylelintcache
+*.tsbuildinfo
+
+# Coverage & Logs
+coverage/
 *.lcov
-
-# logs
-logs
+.nyc_output/
+logs/
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
-# dotenv environment variable files
+# Environment Variables
 .env
+.env.local
 .env.development.local
 .env.test.local
 .env.production.local
-.env.local
+.env.*
 
-# caches
-.eslintcache
-.cache
-*.tsbuildinfo
-.vite
-.bun-cache
+# Editor Specific
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.vim
+*.vscode-test
 
-# editor config
-.vscode
-.idea
-
-# OS files
+# System & OS Files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+.AppleDouble
+.LSOverride
