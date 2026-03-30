@@ -1,3 +1,3 @@
-import { runCli } from "./core/optimize.ts";
+import { runCli } from "./core/optimise.ts";
 
 runCli();

@@ -1,6 +1,7 @@
 import {
   DEFAULT_OLLAMA_GENERATE_URL,
   DEFAULT_OLLAMA_MODEL,
+  DEFAULT_OLLAMA_TAGS_URL,
   generateOllamaPrompt,
   listOllamaModels,
 } from "../../ollama/index";
@@ -19,5 +20,10 @@ export async function optimizeWithOllama(request: OptimizeRequest): Promise<Opti
 }
 
 export async function listOllamaProviderModels(request: ListModelsRequest): Promise<string[]> {
-  return await listOllamaModels(request.baseUrl);
+  // If a custom baseUrl is provided, construct the tags endpoint URL from it
+  // Otherwise use the default tags URL
+  const tagsUrl = request.baseUrl
+    ? `${request.baseUrl.replace(/\/$/, "")}/api/tags`
+    : DEFAULT_OLLAMA_TAGS_URL;
+  return await listOllamaModels(tagsUrl);
 }

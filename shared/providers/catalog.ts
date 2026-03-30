@@ -17,7 +17,7 @@ export const CORE_PROVIDERS: Record<CoreProviderId, ProviderMeta> = {
   openai: {
     id: "openai",
     displayName: "OpenAI",
-    defaultModel: "gpt-4.1-mini",
+    defaultModel: "gpt-5.4-mini",
     requiresApiKey: true,
   },
   anthropic: {

@@ -1,5 +1,5 @@
 import { DEFAULT_SYSTEM_PROMPT } from "../prompts";
-import type { OptimizeRequest, OptimizeResponse } from "../types";
+import type { ListModelsRequest, OptimizeRequest, OptimizeResponse } from "../types";
 
 const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models";
 
@@ -70,4 +70,47 @@ export async function optimizeWithGoogle(request: OptimizeRequest): Promise<Opti
   }
 
   throw new Error("Google returned no text output.");
+}
+
+export async function listGoogleModels(request: ListModelsRequest): Promise<string[]> {
+  const apiKey = requireApiKey(request.apiKey);
+  // Construct the models endpoint URL from baseUrl if provided
+  const baseUrl = request.baseUrl?.replace(/\/$/, "") ?? GEMINI_BASE_URL;
+  const url = `${baseUrl}?key=${encodeURIComponent(apiKey)}`;
+
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    return [];
+  }
+
+  const data = (await response.json()) as {
+    models?: Array<{
+      name?: string;
+      supportedGenerationMethods?: string[];
+    }>;
+  };
+
+  if (!Array.isArray(data.models)) {
+    return [];
+  }
+
+  // Filter to models that support generateContent (text generation)
+  // and extract just the model name (strip "models/" prefix)
+  return data.models
+    .filter((model) => {
+      const supportsGenerate = model.supportedGenerationMethods?.includes("generateContent");
+      return supportsGenerate && typeof model.name === "string" && !!model.name;
+    })
+    .map((model) => {
+      // Model names come as "models/gemini-pro", we want just "gemini-pro"
+      const name = model.name as string;
+      return name.startsWith("models/") ? name.slice(7) : name;
+    })
+    .sort();
 }

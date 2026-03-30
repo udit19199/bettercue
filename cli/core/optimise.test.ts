@@ -25,7 +25,7 @@ mock.module("./keychain.ts", () => ({
   saveProviderKey: mock(() => undefined),
 }));
 
-const optimizeModule = await import("./optimize.ts");
+const optimizeModule = await import("./optimise.ts");
 
 describe("resolveApiKey", () => {
   it("prefers keychain on macOS", () => {
@@ -37,13 +37,14 @@ describe("resolveApiKey", () => {
   });
 });
 
-describe("optimizePrompt", () => {
+describe("optimisePrompt", () => {
   it("forwards the provider request and system prompt", async () => {
-    const text = await optimizeModule.optimizePrompt("make this better", {
+    const text = await optimizeModule.optimisePrompt("make this better", {
       provider: "ollama",
       model: "deepseek-r1:latest",
     });
-
-    expect(text).toContain("ollama:deepseek-r1:latest:");
+    expect(text).toContain("ollama");
+    expect(text).toContain("deepseek-r1:latest");
+    expect(text).toContain("Better-Cue");
   });
 });

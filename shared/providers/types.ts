@@ -23,3 +23,16 @@ export type ListModelsRequest = {
   apiKey?: string | null;
   baseUrl?: string;
 };
+
+export type GenerateQuestionsRequest = {
+  provider: CoreProviderId;
+  prompt: string;
+  model: string;
+  apiKey?: string | null;
+  baseUrl?: string;
+};
+
+export type GenerateQuestionsResponse = {
+  questions: string[];
+  raw?: unknown;
+};

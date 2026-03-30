@@ -1,7 +1,9 @@
 import { DEFAULT_SYSTEM_PROMPT } from "../prompts";
 import type { ListModelsRequest, OptimizeRequest, OptimizeResponse } from "../types";
 
-const RESPONSES_ENDPOINT = "https://api.openai.com/v1/responses";
+const OPENAI_BASE_URL = "https://api.openai.com";
+const RESPONSES_ENDPOINT = `${OPENAI_BASE_URL}/v1/responses`;
+const MODELS_ENDPOINT = `${OPENAI_BASE_URL}/v1/models`;
 
 function classifyOpenAIError(status: number, bodyText: string): Error {
   if (status === 401) {
@@ -75,7 +77,12 @@ export async function optimizeWithOpenAI(request: OptimizeRequest): Promise<Opti
 
 export async function listOpenAIModels(request: ListModelsRequest): Promise<string[]> {
   const apiKey = requireApiKey(request.apiKey);
-  const response = await fetch("https://api.openai.com/v1/models", {
+  // Construct the models endpoint URL from baseUrl if provided
+  const modelsUrl = request.baseUrl
+    ? `${request.baseUrl.replace(/\/$/, "")}/v1/models`
+    : MODELS_ENDPOINT;
+
+  const response = await fetch(modelsUrl, {
     method: "GET",
     headers: {
       Authorization: `Bearer ${apiKey}`,
