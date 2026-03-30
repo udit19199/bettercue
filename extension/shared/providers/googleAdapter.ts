@@ -1,4 +1,4 @@
-import { CORE_PROVIDERS, getSystemPrompt } from "@shared/providers";
+import { CORE_PROVIDERS, getSystemPrompt, listProviderModels } from "@shared/providers";
 
 import { createRewriteAdapter } from "./rewriteAdapter";
 
@@ -21,6 +21,10 @@ const googleAdapter = createRewriteAdapter({
       },
       notes: `Rewritten via Google Gemini API (model: ${model || resolvedModel}, preset: ${preset})`,
     };
+  },
+  listModels: async (apiKey: string | null) => {
+    if (!apiKey) return [];
+    return await listProviderModels({ provider: "google", apiKey });
   },
 });
 

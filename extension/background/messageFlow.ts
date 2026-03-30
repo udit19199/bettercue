@@ -7,6 +7,7 @@
  */
 
 import type { ProviderAdapter, RewriteOptions } from "../shared/providers/provider";
+import { generateQuestionsWithProvider, type CoreProviderId } from "@shared/providers";
 
 export type BackgroundMessage =
   | {
@@ -23,11 +24,21 @@ export type BackgroundMessage =
       payload: {
         provider: string;
       };
+    }
+  | {
+      type: "generate-questions";
+      payload: {
+        adapterId: string;
+        model: string;
+        prompt: string;
+        apiKey?: string | null;
+      };
     };
 
 export type BackgroundReply =
   | { ok: true; result: unknown }
   | { ok: true; models: string[] }
+  | { ok: true; questions: string[] }
   | { ok: false; error: string };
 
 type CachedModels = {
@@ -114,6 +125,30 @@ export function createBackgroundMessageFlow(deps: BackgroundDeps) {
     return { ok: true, models };
   }
 
+  async function handleGenerateQuestions(payload: Record<string, unknown>): Promise<BackgroundReply> {
+    const adapterId = readString(payload.adapterId, "adapterId");
+    const model = readString(payload.model, "model");
+    const prompt = readString(payload.prompt, "prompt");
+    const apiKey = typeof payload.apiKey === "string" ? payload.apiKey : null;
+
+    const adapter = deps.getAdapter(adapterId);
+    if (!adapter) {
+      throw new Error(`Adapter not found: ${adapterId}`);
+    }
+
+    // Map adapter ID to provider ID for the shared function
+    const provider = adapterId as CoreProviderId;
+
+    const response = await generateQuestionsWithProvider({
+      provider,
+      prompt,
+      model,
+      apiKey,
+    });
+
+    return { ok: true, questions: response.questions };
+  }
+
   return {
     async handle(message: unknown): Promise<BackgroundReply> {
       try {
@@ -133,6 +168,13 @@ export function createBackgroundMessageFlow(deps: BackgroundDeps) {
             throw new Error("Invalid or missing payload.");
           }
           return await handleListModels(message.payload as Record<string, unknown>);
+        }
+
+        if (message.type === "generate-questions") {
+          if (!isObject(message.payload)) {
+            throw new Error("Invalid or missing payload.");
+          }
+          return await handleGenerateQuestions(message.payload as Record<string, unknown>);
         }
 
         throw new Error(`Unsupported background message: ${String(message.type)}`);

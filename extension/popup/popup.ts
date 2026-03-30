@@ -1,33 +1,263 @@
 import { loadKey, loadLastUsedModel, saveLastUsedModel, loadPreciseTokensSetting, type ProviderId } from "../shared/storage/keys";
 import { CORE_PROVIDERS } from "@shared/providers";
+import { enrichModelsWithPricing, type ModelInfo } from "@shared/providers/pricing";
 
 // ─── DOM refs ─────────────────────────────────────────────────────────────────
 
-const promptEl      = document.getElementById("prompt")   as HTMLTextAreaElement;
-const providerEl    = document.getElementById("provider") as HTMLSelectElement;
-// modelEl may be a text input or a select depending on UI state
-const modelEl       = document.getElementById("model")    as HTMLInputElement | HTMLSelectElement;
-const presetEl      = document.getElementById("preset")   as HTMLSelectElement;
-const optimizeBtn   = document.getElementById("optimize") as HTMLButtonElement;
-const previewEl     = document.getElementById("preview")  as HTMLDivElement;
-const tokenEstEl    = document.getElementById("token-est") as HTMLSpanElement;
-const copyBtn       = document.getElementById("copy")     as HTMLButtonElement;
-const replaceBtn    = document.getElementById("replace")  as HTMLButtonElement;
-const settingsBtn   = document.getElementById("settings") as HTMLButtonElement;
-const noKeyWarning  = document.getElementById("no-key-warning") as HTMLDivElement;
+const promptEl = document.getElementById("prompt") as HTMLTextAreaElement;
+const providerEl = document.getElementById("provider") as HTMLSelectElement;
+const modelInputEl = document.getElementById("model") as HTMLInputElement;
+const modelDropdownEl = document.getElementById("model-dropdown") as HTMLDivElement;
+const modelLoadingEl = document.getElementById("model-loading") as HTMLDivElement;
+const modelSelectorEl = document.getElementById("model-selector") as HTMLDivElement;
+const presetEl = document.getElementById("preset") as HTMLSelectElement;
+const optimizeBtn = document.getElementById("optimize") as HTMLButtonElement;
+const previewEl = document.getElementById("preview") as HTMLDivElement;
+const tokenEstEl = document.getElementById("token-est") as HTMLSpanElement;
+const copyBtn = document.getElementById("copy") as HTMLButtonElement;
+const replaceBtn = document.getElementById("replace") as HTMLButtonElement;
+const settingsBtn = document.getElementById("settings") as HTMLButtonElement;
+const noKeyWarning = document.getElementById("no-key-warning") as HTMLDivElement;
+
+// Questions flow elements
+const questionsSectionEl = document.getElementById("questions-section") as HTMLDivElement;
+const questionsContainerEl = document.getElementById("questions-container") as HTMLDivElement;
+const questionsLoadingEl = document.getElementById("questions-loading") as HTMLDivElement;
+const questionsActionsEl = document.getElementById("questions-actions") as HTMLDivElement;
+const questionsSkipEl = document.getElementById("questions-skip") as HTMLSpanElement;
+const questionsSubmitEl = document.getElementById("questions-submit") as HTMLButtonElement;
+
+// ─── State ────────────────────────────────────────────────────────────────────
+
+type Question = {
+  id: string;
+  question: string;
+  answer?: string;
+};
+
+let currentModels: ModelInfo[] = [];
+let filteredModels: ModelInfo[] = [];
+let selectedModel: string = "";
+let isDropdownOpen = false;
+let currentQuestions: Question[] = [];
+let originalPromptForQuestions: string = "";
 
 // ─── Defaults per provider ────────────────────────────────────────────────────
 
 const DEFAULT_MODELS: Record<string, string> = {
-  openai:    CORE_PROVIDERS.openai.defaultModel,
+  openai: CORE_PROVIDERS.openai.defaultModel,
   anthropic: CORE_PROVIDERS.anthropic.defaultModel,
-  google:    CORE_PROVIDERS.google.defaultModel,
-  mock:      "mock-model",
-  ollama:    CORE_PROVIDERS.ollama.defaultModel,
+  google: CORE_PROVIDERS.google.defaultModel,
+  mock: "mock-model",
+  ollama: CORE_PROVIDERS.ollama.defaultModel,
 };
 
 function needsApiKey(provider: ProviderId): boolean {
   return provider !== "mock" && provider !== "ollama";
+}
+
+// ─── Model Selector ───────────────────────────────────────────────────────────
+
+function renderModelOptions(models: ModelInfo[]) {
+  // Clear existing options (except loading indicator)
+  const existingOptions = modelDropdownEl.querySelectorAll(".model-option");
+  existingOptions.forEach((opt) => opt.remove());
+
+  const emptyEl = modelDropdownEl.querySelector(".model-dropdown-empty");
+  if (emptyEl) emptyEl.remove();
+
+  modelLoadingEl.hidden = true;
+
+  if (models.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "model-dropdown-empty";
+    empty.textContent = "No models found";
+    modelDropdownEl.appendChild(empty);
+    return;
+  }
+
+  models.forEach((model) => {
+    const option = document.createElement("div");
+    option.className = "model-option";
+    if (model.id === selectedModel) {
+      option.classList.add("selected");
+    }
+
+    const nameSpan = document.createElement("span");
+    nameSpan.className = "model-option-name";
+    nameSpan.textContent = model.displayName;
+    nameSpan.title = model.id;
+
+    const priceSpan = document.createElement("span");
+    priceSpan.className = "model-option-price";
+    if (model.priceLabel) {
+      priceSpan.textContent = model.priceLabel;
+      if (model.priceLabel.includes("Free")) {
+        priceSpan.classList.add("free");
+      }
+    }
+
+    option.appendChild(nameSpan);
+    if (model.priceLabel) {
+      option.appendChild(priceSpan);
+    }
+
+    option.addEventListener("click", () => {
+      selectModel(model.id);
+      closeDropdown();
+    });
+
+    modelDropdownEl.appendChild(option);
+  });
+}
+
+function filterModels(query: string) {
+  const lowerQuery = query.toLowerCase().trim();
+  if (!lowerQuery) {
+    filteredModels = currentModels;
+  } else {
+    filteredModels = currentModels.filter(
+      (m) =>
+        m.id.toLowerCase().includes(lowerQuery) ||
+        m.displayName.toLowerCase().includes(lowerQuery)
+    );
+  }
+  renderModelOptions(filteredModels);
+}
+
+function selectModel(modelId: string) {
+  selectedModel = modelId;
+  const model = currentModels.find((m) => m.id === modelId);
+  modelInputEl.value = model?.displayName ?? modelId;
+
+  // Update selected state in dropdown
+  const options = modelDropdownEl.querySelectorAll(".model-option");
+  options.forEach((opt, idx) => {
+    if (filteredModels[idx]?.id === modelId) {
+      opt.classList.add("selected");
+    } else {
+      opt.classList.remove("selected");
+    }
+  });
+}
+
+function openDropdown() {
+  isDropdownOpen = true;
+  modelDropdownEl.classList.add("open");
+  filterModels(modelInputEl.value);
+}
+
+function closeDropdown() {
+  isDropdownOpen = false;
+  modelDropdownEl.classList.remove("open");
+  // Restore selected model name if input was cleared
+  if (!modelInputEl.value.trim() && selectedModel) {
+    const model = currentModels.find((m) => m.id === selectedModel);
+    modelInputEl.value = model?.displayName ?? selectedModel;
+  }
+}
+
+// Model input event handlers
+modelInputEl.addEventListener("focus", () => {
+  openDropdown();
+  // Select all text for easy replacement
+  modelInputEl.select();
+});
+
+modelInputEl.addEventListener("input", () => {
+  filterModels(modelInputEl.value);
+  if (!isDropdownOpen) {
+    openDropdown();
+  }
+});
+
+modelInputEl.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    closeDropdown();
+    modelInputEl.blur();
+  } else if (e.key === "Enter") {
+    // Select first filtered result or use typed value
+    if (filteredModels.length > 0) {
+      selectModel(filteredModels[0].id);
+    } else if (modelInputEl.value.trim()) {
+      selectedModel = modelInputEl.value.trim();
+    }
+    closeDropdown();
+    modelInputEl.blur();
+  } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    e.preventDefault();
+    if (!isDropdownOpen) {
+      openDropdown();
+      return;
+    }
+    // Navigate through options
+    const currentIndex = filteredModels.findIndex((m) => m.id === selectedModel);
+    let newIndex = currentIndex;
+    if (e.key === "ArrowDown") {
+      newIndex = Math.min(currentIndex + 1, filteredModels.length - 1);
+    } else {
+      newIndex = Math.max(currentIndex - 1, 0);
+    }
+    if (filteredModels[newIndex]) {
+      selectModel(filteredModels[newIndex].id);
+    }
+  }
+});
+
+// Close dropdown when clicking outside
+document.addEventListener("click", (e) => {
+  if (!modelSelectorEl.contains(e.target as Node)) {
+    closeDropdown();
+  }
+});
+
+// ─── Model list fetching ──────────────────────────────────────────────────────
+
+async function fetchAndPopulateModels(provider: ProviderId, desiredModel: string) {
+  modelLoadingEl.hidden = false;
+  modelLoadingEl.textContent = "Loading models...";
+  currentModels = [];
+  filteredModels = [];
+
+  // Try to read cached models
+  const cacheKey = `models.${provider}`;
+  const cached = await new Promise<{ items?: string[]; fetchedAt?: number } | null>((res) =>
+    chrome.storage.local.get([cacheKey], (r) => res(r[cacheKey] ?? null))
+  );
+  const now = Date.now();
+
+  let modelIds: string[] = [];
+  if (cached?.items && cached.fetchedAt && now - cached.fetchedAt < 1000 * 60 * 60) {
+    modelIds = cached.items;
+  } else {
+    // Ask background to list models
+    modelIds = await new Promise<string[]>((res) => {
+      chrome.runtime.sendMessage({ type: "list-models", payload: { provider } }, (resp) => {
+        if (resp?.ok && Array.isArray(resp.models)) return res(resp.models);
+        return res([]);
+      });
+    });
+  }
+
+  // Enrich with pricing information
+  currentModels = enrichModelsWithPricing(provider, modelIds);
+  filteredModels = currentModels;
+
+  // Set default selected model
+  const hasDesired = currentModels.some((m) => m.id === desiredModel);
+  if (hasDesired) {
+    selectedModel = desiredModel;
+  } else if (currentModels.length > 0) {
+    selectedModel = currentModels[0].id;
+  } else {
+    selectedModel = desiredModel || DEFAULT_MODELS[provider] || "";
+  }
+
+  // Update input value
+  const model = currentModels.find((m) => m.id === selectedModel);
+  modelInputEl.value = model?.displayName ?? selectedModel;
+
+  renderModelOptions(currentModels);
 }
 
 // ─── Init: restore last-used model and check key ─────────────────────────────
@@ -35,11 +265,8 @@ function needsApiKey(provider: ProviderId): boolean {
 async function init() {
   const provider = providerEl.value as ProviderId;
   const lastModel = await loadLastUsedModel(provider);
-  // populate model control (may fetch list)
-  await populateModelControl(provider, lastModel ?? DEFAULT_MODELS[provider] ?? "");
+  await fetchAndPopulateModels(provider, lastModel ?? DEFAULT_MODELS[provider] ?? "");
   await checkKey(provider);
-
-  // populate token estimate for current input
   updateTokenEstimate();
 }
 
@@ -57,8 +284,10 @@ async function checkKey(provider: ProviderId) {
 providerEl.addEventListener("change", async () => {
   const provider = providerEl.value as ProviderId;
   const lastModel = await loadLastUsedModel(provider);
-  await populateModelControl(provider, lastModel ?? DEFAULT_MODELS[provider] ?? "");
+  await fetchAndPopulateModels(provider, lastModel ?? DEFAULT_MODELS[provider] ?? "");
   await checkKey(provider);
+  // Hide questions section when provider changes
+  hideQuestionsSection();
 });
 
 // ─── Token estimate (heuristic; updates on input change) ─────────────────────
@@ -74,17 +303,127 @@ function updateTokenEstimate() {
 
 promptEl.addEventListener("input", updateTokenEstimate);
 
+// ─── Questions Flow ───────────────────────────────────────────────────────────
+
+function showQuestionsSection() {
+  questionsSectionEl.hidden = false;
+  questionsLoadingEl.hidden = false;
+  questionsActionsEl.hidden = true;
+}
+
+function hideQuestionsSection() {
+  questionsSectionEl.hidden = true;
+  currentQuestions = [];
+  originalPromptForQuestions = "";
+}
+
+function renderQuestions(questions: Question[]) {
+  questionsLoadingEl.hidden = true;
+
+  // Clear existing question items
+  const existingItems = questionsContainerEl.querySelectorAll(".question-item");
+  existingItems.forEach((item) => item.remove());
+
+  if (questions.length === 0) {
+    // No questions needed, proceed directly to optimization
+    hideQuestionsSection();
+    performOptimization();
+    return;
+  }
+
+  questionsActionsEl.hidden = false;
+
+  questions.forEach((q) => {
+    const item = document.createElement("div");
+    item.className = "question-item";
+
+    const label = document.createElement("div");
+    label.className = "question-label";
+    label.textContent = q.question;
+
+    const input = document.createElement("textarea");
+    input.className = "question-input";
+    input.placeholder = "Your answer...";
+    input.rows = 2;
+    input.dataset.questionId = q.id;
+
+    item.appendChild(label);
+    item.appendChild(input);
+    questionsContainerEl.appendChild(item);
+  });
+}
+
+async function fetchQuestions(prompt: string): Promise<Question[]> {
+  const provider = providerEl.value as ProviderId;
+  const model = selectedModel || DEFAULT_MODELS[provider];
+  const apiKey = needsApiKey(provider) ? await loadKey(provider) : null;
+
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage(
+      {
+        type: "generate-questions",
+        payload: {
+          adapterId: provider,
+          model,
+          apiKey,
+          prompt,
+        },
+      },
+      (resp) => {
+        if (resp?.ok && Array.isArray(resp.questions)) {
+          resolve(
+            resp.questions.map((q: string, idx: number) => ({
+              id: `q-${idx}`,
+              question: q,
+            }))
+          );
+        } else {
+          // No questions or error - proceed without questions
+          resolve([]);
+        }
+      }
+    );
+  });
+}
+
+function collectAnswers(): Record<string, string> {
+  const answers: Record<string, string> = {};
+  const inputs = questionsContainerEl.querySelectorAll(".question-input") as NodeListOf<HTMLTextAreaElement>;
+  inputs.forEach((input) => {
+    const qId = input.dataset.questionId;
+    if (qId && input.value.trim()) {
+      answers[qId] = input.value.trim();
+    }
+  });
+  return answers;
+}
+
+function buildEnhancedPrompt(): string {
+  const answers = collectAnswers();
+  let enhanced = originalPromptForQuestions;
+
+  // Append answered questions as context
+  const answeredQuestions = currentQuestions.filter((q) => answers[q.id]);
+  if (answeredQuestions.length > 0) {
+    enhanced += "\n\n[Additional context from clarifying questions:]\n";
+    answeredQuestions.forEach((q) => {
+      enhanced += `Q: ${q.question}\nA: ${answers[q.id]}\n`;
+    });
+  }
+
+  return enhanced;
+}
+
 // ─── Optimize ─────────────────────────────────────────────────────────────────
 
-optimizeBtn.addEventListener("click", async () => {
-  const original = promptEl.value.trim();
+async function performOptimization(enhancedPrompt?: string) {
+  const original = enhancedPrompt ?? promptEl.value.trim();
   if (!original) return;
 
   const provider = providerEl.value as ProviderId;
-  const model    = (modelEl as HTMLInputElement).value || (modelEl as HTMLSelectElement).value || DEFAULT_MODELS[provider];
-  const preset   = presetEl.value;
+  const model = selectedModel || DEFAULT_MODELS[provider];
+  const preset = presetEl.value;
 
-  // Load the stored API key (null for mock)
   const apiKey = needsApiKey(provider) ? await loadKey(provider) : null;
 
   if (needsApiKey(provider) && !apiKey) {
@@ -94,10 +433,10 @@ optimizeBtn.addEventListener("click", async () => {
   }
 
   previewEl.classList.remove("error");
-  previewEl.textContent = "Optimizing…";
+  previewEl.textContent = "Optimizing...";
   optimizeBtn.disabled = true;
+  hideQuestionsSection();
 
-  // Load precise-tokens preference (for future use by background)
   const preciseTokens = await loadPreciseTokensSetting();
 
   chrome.runtime.sendMessage(
@@ -123,7 +462,6 @@ optimizeBtn.addEventListener("click", async () => {
         previewEl.classList.remove("error");
         const est = resp.result.tokenEstimate;
         if (est) tokenEstEl.textContent = `~${est} tokens (optimized)`;
-        // persist last-used model
         saveLastUsedModel(provider, model);
       } else {
         previewEl.textContent = `Error: ${resp.error}`;
@@ -131,6 +469,47 @@ optimizeBtn.addEventListener("click", async () => {
       }
     }
   );
+}
+
+optimizeBtn.addEventListener("click", async () => {
+  const original = promptEl.value.trim();
+  if (!original) return;
+
+  const provider = providerEl.value as ProviderId;
+  const apiKey = needsApiKey(provider) ? await loadKey(provider) : null;
+
+  if (needsApiKey(provider) && !apiKey) {
+    previewEl.textContent = "No API key found. Open Settings to add one.";
+    previewEl.classList.add("error");
+    return;
+  }
+
+  // Store original prompt for questions flow
+  originalPromptForQuestions = original;
+
+  // Show questions section and fetch questions
+  showQuestionsSection();
+  questionsLoadingEl.textContent = "Analyzing your prompt...";
+
+  try {
+    currentQuestions = await fetchQuestions(original);
+    renderQuestions(currentQuestions);
+  } catch {
+    // On error, proceed without questions
+    hideQuestionsSection();
+    performOptimization();
+  }
+});
+
+// Questions flow event handlers
+questionsSkipEl.addEventListener("click", () => {
+  hideQuestionsSection();
+  performOptimization(originalPromptForQuestions);
+});
+
+questionsSubmitEl.addEventListener("click", () => {
+  const enhanced = buildEnhancedPrompt();
+  performOptimization(enhanced);
 });
 
 // ─── Copy ─────────────────────────────────────────────────────────────────────
@@ -182,7 +561,6 @@ settingsBtn.addEventListener("click", () => {
   chrome.runtime.openOptionsPage();
 });
 
-// Also wire the inline warning link that opens settings
 document.getElementById("open-settings-link")?.addEventListener("click", () => {
   chrome.runtime.openOptionsPage();
 });
@@ -199,76 +577,3 @@ chrome.runtime.onMessage.addListener((message) => {
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 
 init();
-
-// ─── Model list fetching & UI population ───────────────────────────────────────
-
-async function populateModelControl(provider: ProviderId, desiredModel: string) {
-  // Try to read cached models
-  const cacheKey = `models.${provider}`;
-  const cached = await new Promise<any>((res) => chrome.storage.local.get([cacheKey], (r) => res(r[cacheKey] ?? null)));
-  const now = Date.now();
-
-  let models: string[] | null = null;
-  if (cached && cached.items && cached.fetchedAt && now - cached.fetchedAt < 1000 * 60 * 60) {
-    models = cached.items;
-  } else {
-    // ask background to list models
-    models = await new Promise<string[]>((res) => {
-      chrome.runtime.sendMessage({ type: "list-models", payload: { provider } }, (resp) => {
-        if (resp?.ok && Array.isArray(resp.models)) return res(resp.models);
-        return res([]);
-      });
-    });
-  }
-
-  const container = modelEl.parentElement;
-  if (!container) return;
-
-  // If models found, replace text input with a select
-  if (models && models.length > 0) {
-    const select = document.createElement("select");
-    select.id = "model";
-    for (const m of models) {
-      const opt = document.createElement("option");
-      opt.value = m;
-      opt.textContent = m;
-      select.appendChild(opt);
-    }
-    const customOpt = document.createElement("option");
-    customOpt.value = "__custom__";
-    customOpt.textContent = "Custom…";
-    select.appendChild(customOpt);
-
-    // preserve previous value if present
-    if (desiredModel && models.includes(desiredModel)) select.value = desiredModel;
-
-    // swap in DOM
-    container.replaceChild(select, modelEl);
-    // update ref
-    (modelEl as any) = select;
-
-    select.addEventListener("change", () => {
-      if (select.value === "__custom__") {
-        // swap back to input
-        const input = document.createElement("input");
-        input.type = "text";
-        input.id = "model";
-        input.spellcheck = false;
-        container.replaceChild(input, select);
-        (modelEl as any) = input;
-        input.value = desiredModel;
-      }
-    });
-  } else {
-    // ensure it's an input
-    if ((modelEl as HTMLInputElement).tagName !== "INPUT") {
-      const input = document.createElement("input");
-      input.type = "text";
-      input.id = "model";
-      input.spellcheck = false;
-      container.replaceChild(input, modelEl);
-      (modelEl as any) = input;
-    }
-    (modelEl as HTMLInputElement).value = desiredModel;
-  }
-}

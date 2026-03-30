@@ -1,4 +1,4 @@
-import { CORE_PROVIDERS, getSystemPrompt } from "@shared/providers";
+import { CORE_PROVIDERS, getSystemPrompt, listProviderModels } from "@shared/providers";
 
 import { createRewriteAdapter } from "./rewriteAdapter";
 
@@ -22,6 +22,10 @@ const anthropicAdapter = createRewriteAdapter({
       },
       notes: `Rewritten via Anthropic Messages API (model: ${model || resolvedModel}, preset: ${preset})`,
     };
+  },
+  listModels: async (apiKey: string | null) => {
+    if (!apiKey) return [];
+    return await listProviderModels({ provider: "anthropic", apiKey });
   },
 });
 

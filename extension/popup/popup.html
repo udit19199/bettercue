@@ -225,6 +225,197 @@
         transition: border-color 0.15s, background 0.15s;
       }
       .action-btn:hover { border-color: var(--accent); }
+
+      /* ── Model selector with search ── */
+      .model-selector {
+        position: relative;
+      }
+
+      .model-selector-input {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        color: var(--text);
+        font-family: var(--font);
+        font-size: 12px;
+        outline: none;
+        padding: 6px 28px 6px 8px;
+        transition: border-color 0.15s;
+        width: 100%;
+        cursor: pointer;
+      }
+      .model-selector-input:focus { border-color: var(--accent2); }
+      .model-selector-input::placeholder { color: var(--text-muted); }
+
+      .model-selector-arrow {
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--text-muted);
+        font-size: 10px;
+        pointer-events: none;
+      }
+
+      .model-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        margin-top: 4px;
+        max-height: 200px;
+        overflow-y: auto;
+        z-index: 100;
+        display: none;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      }
+
+      .model-dropdown.open { display: block; }
+
+      .model-option {
+        padding: 8px 10px;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+        transition: background 0.1s;
+      }
+      .model-option:hover { background: var(--border); }
+      .model-option.selected { background: rgba(110, 231, 183, 0.1); }
+
+      .model-option-name {
+        flex: 1;
+        font-size: 12px;
+        color: var(--text);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .model-option-price {
+        font-size: 10px;
+        color: var(--text-muted);
+        white-space: nowrap;
+        padding: 2px 6px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 4px;
+      }
+      .model-option-price.free {
+        color: var(--accent);
+        background: rgba(110, 231, 183, 0.1);
+      }
+
+      .model-dropdown-empty {
+        padding: 12px;
+        text-align: center;
+        color: var(--text-muted);
+        font-size: 11px;
+      }
+
+      .model-dropdown-loading {
+        padding: 12px;
+        text-align: center;
+        color: var(--text-muted);
+        font-size: 11px;
+      }
+
+      /* ── Questions flow ── */
+      .questions-section {
+        margin-top: 12px;
+        padding: 12px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+      }
+
+      .questions-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 10px;
+      }
+
+      .questions-title {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: var(--accent);
+      }
+
+      .questions-skip {
+        font-size: 11px;
+        color: var(--text-muted);
+        cursor: pointer;
+        text-decoration: underline;
+      }
+      .questions-skip:hover { color: var(--text); }
+
+      .question-item {
+        margin-bottom: 10px;
+      }
+
+      .question-label {
+        font-size: 12px;
+        color: var(--text);
+        margin-bottom: 6px;
+        line-height: 1.4;
+      }
+
+      .question-input {
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        color: var(--text);
+        font-family: var(--font);
+        font-size: 12px;
+        outline: none;
+        padding: 8px 10px;
+        transition: border-color 0.15s;
+        width: 100%;
+        resize: vertical;
+        min-height: 36px;
+      }
+      .question-input:focus { border-color: var(--accent2); }
+
+      .questions-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 12px;
+      }
+
+      .questions-btn {
+        flex: 1;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        color: var(--text);
+        cursor: pointer;
+        font-family: var(--font);
+        font-size: 12px;
+        font-weight: 500;
+        padding: 8px;
+        transition: border-color 0.15s, background 0.15s;
+      }
+      .questions-btn:hover { border-color: var(--accent); }
+      .questions-btn.primary {
+        background: linear-gradient(135deg, var(--accent), var(--accent2));
+        border: none;
+        color: #0f1117;
+        font-weight: 600;
+      }
+      .questions-btn.primary:hover { opacity: 0.9; }
+
+      .questions-loading {
+        text-align: center;
+        padding: 16px;
+        color: var(--text-muted);
+        font-size: 12px;
+      }
     </style>
   </head>
   <body>
@@ -261,7 +452,13 @@
       </div>
       <div class="control-group">
         <label>Model</label>
-        <input type="text" id="model" value="gpt-4o" spellcheck="false" />
+        <div class="model-selector" id="model-selector">
+          <input type="text" class="model-selector-input" id="model" placeholder="Search models..." spellcheck="false" autocomplete="off" />
+          <span class="model-selector-arrow">▼</span>
+          <div class="model-dropdown" id="model-dropdown">
+            <div class="model-dropdown-loading" id="model-loading">Loading models...</div>
+          </div>
+        </div>
       </div>
       <div class="control-group">
         <label>Preset</label>
@@ -280,6 +477,20 @@
 
     <!-- Optimize -->
     <button class="optimize-btn" id="optimize">Optimize Prompt</button>
+
+    <!-- Questions section (hidden by default) -->
+    <div class="questions-section" id="questions-section" hidden>
+      <div class="questions-header">
+        <span class="questions-title">Clarifying Questions</span>
+        <span class="questions-skip" id="questions-skip">Skip & Optimize</span>
+      </div>
+      <div id="questions-container">
+        <div class="questions-loading" id="questions-loading">Analyzing your prompt...</div>
+      </div>
+      <div class="questions-actions" id="questions-actions" hidden>
+        <button class="questions-btn primary" id="questions-submit">Optimize with Answers</button>
+      </div>
+    </div>
 
     <!-- Preview -->
     <p class="preview-label">Result</p>
