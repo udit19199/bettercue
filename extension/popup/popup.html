@@ -8,14 +8,15 @@
       *, *::before, *::after { box-sizing: border-box; }
 
       :root {
-        --bg: #0f1117;
-        --surface: #1a1d27;
-        --border: #2a2d3d;
-        --accent: #6ee7b7;
-        --accent2: #60a5fa;
-        --text: #e2e8f0;
-        --text-muted: #7c85a2;
-        --danger: #f87171;
+        /* Lower-contrast grey & white theme */
+        --bg: #1e1e1e; /* dark grey background */
+        --surface: #2a2a2a; /* slightly lighter surface */
+        --border: rgba(255,255,255,0.08);
+        --accent: #e6e6e6; /* pale grey accent */
+        --accent2: #ffffff;
+        --text: #f3f4f6; /* off-white text */
+        --text-muted: rgba(243,244,246,0.7);
+        --danger: #ff9b9b; /* muted red for danger */
         --radius: 8px;
         --font: Inter, system-ui, "Segoe UI", Arial, sans-serif;
       }
@@ -41,7 +42,7 @@
       .logo {
         width: 32px;
         height: 32px;
-        background: linear-gradient(135deg, var(--accent), var(--accent2));
+        background: var(--surface);
         border-radius: 8px;
         flex-shrink: 0;
         position: relative;
@@ -79,8 +80,8 @@
 
       /* ── Warning ── */
       .warning {
-        background: rgba(248,113,113,0.08);
-        border: 1px solid rgba(248,113,113,0.3);
+        background: rgba(255,255,255,0.02);
+        border: 1px solid rgba(255,255,255,0.06);
         border-radius: 6px;
         color: var(--danger);
         font-size: 12px;
@@ -160,7 +161,7 @@
 
       /* ── Optimize button ── */
       .optimize-btn {
-        background: linear-gradient(135deg, var(--accent), var(--accent2));
+        background: var(--accent);
         border: none;
         border-radius: var(--radius);
         color: #0f1117;
@@ -284,8 +285,8 @@
         gap: 8px;
         transition: background 0.1s;
       }
-      .model-option:hover { background: var(--border); }
-      .model-option.selected { background: rgba(110, 231, 183, 0.1); }
+      .model-option:hover { background: rgba(255,255,255,0.04); }
+      .model-option.selected { background: rgba(255,255,255,0.08); }
 
       .model-option-name {
         flex: 1;
@@ -305,8 +306,8 @@
         border-radius: 4px;
       }
       .model-option-price.free {
-        color: var(--accent);
-        background: rgba(110, 231, 183, 0.1);
+        color: var(--text);
+        background: rgba(255,255,255,0.04);
       }
 
       .model-dropdown-empty {
@@ -403,9 +404,9 @@
       }
       .questions-btn:hover { border-color: var(--accent); }
       .questions-btn.primary {
-        background: linear-gradient(135deg, var(--accent), var(--accent2));
+        background: var(--accent);
         border: none;
-        color: #0f1117;
+        color: #000000;
         font-weight: 600;
       }
       .questions-btn.primary:hover { opacity: 0.9; }
