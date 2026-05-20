@@ -1,34 +1,13 @@
 import { createBackgroundMessageFlow } from "./messageFlow";
+import { readModelsCache, writeModelsCache } from "./modelsCache";
 import { getAdapter } from "./providers";
 import { loadKey } from "../shared/storage/keys";
 
 const flow = createBackgroundMessageFlow({
   getAdapter,
   loadApiKey: loadKey,
-  readModelsCache: async (providerId) => {
-    const cacheKey = `models.${providerId}`;
-    const result = await new Promise<Record<string, unknown>>((resolve) => {
-      chrome.storage.local.get([cacheKey], (items) => resolve(items || {}));
-    });
-
-    const cached = result[cacheKey];
-    if (
-      cached &&
-      typeof cached === "object" &&
-      cached !== null &&
-      Array.isArray((cached as { items?: unknown }).items) &&
-      typeof (cached as { fetchedAt?: unknown }).fetchedAt === "number"
-    ) {
-      return cached as { items: string[]; fetchedAt: number };
-    }
-
-    return null;
-  },
-  writeModelsCache: async (providerId, models, fetchedAt) => {
-    await new Promise<void>((resolve) => {
-      chrome.storage.local.set({ [`models.${providerId}`]: { items: models, fetchedAt } }, resolve);
-    });
-  },
+  readModelsCache,
+  writeModelsCache,
   now: () => Date.now(),
 });
 

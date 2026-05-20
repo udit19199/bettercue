@@ -7,6 +7,9 @@ mock.module("../../shared/providers/index.ts", () => {
     };
   });
 
+  const listProviderModels = mock(async () => ["model-a", "model-b"]);
+  const generateQuestionsWithProvider = mock(async () => ({ questions: [] }));
+
   return {
     CORE_PROVIDER_IDS: ["ollama", "openai", "anthropic", "google"],
     CORE_PROVIDERS: {
@@ -16,6 +19,8 @@ mock.module("../../shared/providers/index.ts", () => {
       google: { displayName: "Google Gemini", defaultModel: "gemini-2.5-flash", requiresApiKey: true },
     },
     optimizeWithProvider,
+    listProviderModels,
+    generateQuestionsWithProvider,
   };
 });
 
@@ -23,6 +28,19 @@ mock.module("./keychain.ts", () => ({
   loadProviderKey: mock(() => "from-keychain"),
   removeProviderKey: mock(() => true),
   saveProviderKey: mock(() => undefined),
+}));
+
+mock.module("./modelCache.ts", () => ({
+  clearCachedModels: mock(async () => undefined),
+  loadCachedModels: mock(async () => ["model-a", "model-b"]),
+  saveCachedModels: mock(async () => undefined),
+}));
+
+mock.module("@inquirer/search", () => ({
+  default: mock(async ({ source }: { source: (input?: string) => Promise<Array<{ value: string }>> }) => {
+    const choices = await source("");
+    return choices.find((choice) => choice.value !== "__refresh__")?.value ?? "model-a";
+  }),
 }));
 
 const optimizeModule = await import("./optimise.ts");

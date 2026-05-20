@@ -3,11 +3,11 @@ import { optimizeWithAnthropic, listAnthropicModels } from "./clients/anthropic"
 import { optimizeWithGoogle, listGoogleModels } from "./clients/google";
 import { optimizeWithOllama, listOllamaProviderModels } from "./clients/ollama";
 import { optimizeWithOpenAI, listOpenAIModels } from "./clients/openai";
-import { DEFAULT_SYSTEM_PROMPT, SYSTEM_PROMPTS, QUESTIONS_SYSTEM_PROMPT, getSystemPrompt } from "./prompts";
+import { DEFAULT_SYSTEM_PROMPT, getSystemPrompt } from "./prompts";
 import type { CoreProviderId, ListModelsRequest, OptimizeRequest, OptimizeResponse, GenerateQuestionsRequest, GenerateQuestionsResponse } from "./types";
 
 export { CORE_PROVIDERS, CORE_PROVIDER_IDS };
-export { DEFAULT_SYSTEM_PROMPT, SYSTEM_PROMPTS, QUESTIONS_SYSTEM_PROMPT, getSystemPrompt };
+export { DEFAULT_SYSTEM_PROMPT, getSystemPrompt };
 export type { CoreProviderId, ListModelsRequest, OptimizeRequest, OptimizeResponse, GenerateQuestionsRequest, GenerateQuestionsResponse };
 
 export async function optimizeWithProvider(request: OptimizeRequest): Promise<OptimizeResponse> {
@@ -47,6 +47,10 @@ export async function listProviderModels(request: ListModelsRequest): Promise<st
 export async function generateQuestionsWithProvider(
   request: GenerateQuestionsRequest
 ): Promise<GenerateQuestionsResponse> {
+  const QUESTIONS_SYSTEM_PROMPT = `You are an expert prompt analyst. Your task is to analyze the user's prompt and identify 1-3 clarifying questions that would help improve the prompt's effectiveness.
+
+Your response must be a JSON array of strings only, with no additional text or formatting.`;
+
   const optimizeRequest: OptimizeRequest = {
     provider: request.provider,
     prompt: request.prompt,

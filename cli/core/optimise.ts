@@ -1,9 +1,11 @@
 import chalk from "chalk";
 import inquirer from "inquirer";
+import search from "@inquirer/search";
 
 import { DEFAULT_MODELS, DEFAULT_PROVIDER, PROVIDER_API_KEY_ENV, SYSTEM_PROMPT } from "./config.ts";
+import { clearCachedModels, loadCachedModels, saveCachedModels } from "./modelCache.ts";
 import { loadProviderKey, removeProviderKey, saveProviderKey } from "./keychain.ts";
-import { CORE_PROVIDER_IDS, CORE_PROVIDERS, optimizeWithProvider } from "../../shared/providers/index.ts";
+import { CORE_PROVIDER_IDS, CORE_PROVIDERS, listProviderModels, optimizeWithProvider } from "../../shared/providers/index.ts";
 import type { CoreProviderId } from "../../shared/providers/index.ts";
 
 export type OptimizeOptions = {
@@ -41,6 +43,84 @@ async function selectKeyProvider(message = "Choose a provider"): Promise<CorePro
     ]);
 
     return provider;
+}
+
+async function chooseProvider(): Promise<CoreProviderId> {
+    const { provider } = await inquirer.prompt<{ provider: CoreProviderId }>([
+        {
+            type: "list",
+            name: "provider",
+            message: "Choose a provider",
+            choices: CORE_PROVIDER_IDS.map((id) => ({
+                name: CORE_PROVIDERS[id].displayName,
+                value: id,
+            })),
+            default: DEFAULT_PROVIDER,
+        },
+    ]);
+
+    return provider;
+}
+
+async function fetchModels(provider: CoreProviderId): Promise<string[]> {
+    const apiKey = resolveApiKey(provider);
+    const baseUrl = provider === "ollama" ? process.env.OLLAMA_BASE_URL ?? undefined : undefined;
+    const models = await listProviderModels({ provider, apiKey, baseUrl });
+    return models.sort((left, right) => left.localeCompare(right));
+}
+
+async function chooseModel(provider: CoreProviderId): Promise<string> {
+    const baseUrl = provider === "ollama" ? process.env.OLLAMA_BASE_URL ?? undefined : undefined;
+    const cachedModels = await loadCachedModels(provider, baseUrl);
+    const models = cachedModels ?? (await fetchAndCacheModels(provider));
+
+    if (!models.length) {
+        throw new Error(`No models found for ${CORE_PROVIDERS[provider].displayName}.`);
+    }
+
+    const selected = await search<string | "__refresh__">({
+        message: `Choose a ${CORE_PROVIDERS[provider].displayName} model`,
+        source: async (input) => {
+            const query = (input ?? "").trim().toLowerCase();
+            const filtered = query
+                ? models.filter((model) => model.toLowerCase().includes(query))
+                : models;
+
+            const choices: Array<{ name: string; value: string; short: string }> = filtered.slice(0, 20).map((model) => ({
+                name: model,
+                value: model,
+                short: model,
+            }));
+
+            if (!query) {
+                choices.unshift({ name: "Refresh model list", value: "__refresh__", short: "Refresh model list" });
+            }
+
+            if (!choices.length) {
+                return [{ name: "No matching models", value: "__none__", disabled: true }];
+            }
+
+            return choices;
+        },
+    });
+
+    if (selected === "__refresh__") {
+        await clearCachedModels(provider, baseUrl);
+        const refreshed = await fetchAndCacheModels(provider);
+        if (!refreshed.length) {
+            throw new Error(`No models found for ${CORE_PROVIDERS[provider].displayName}.`);
+        }
+        return await chooseModel(provider);
+    }
+
+    return selected;
+}
+
+async function fetchAndCacheModels(provider: CoreProviderId): Promise<string[]> {
+    const baseUrl = provider === "ollama" ? process.env.OLLAMA_BASE_URL ?? undefined : undefined;
+    const models = await fetchModels(provider);
+    await saveCachedModels(provider, models, baseUrl);
+    return models;
 }
 
 async function runAuthCommand(): Promise<void> {
@@ -100,36 +180,6 @@ async function runAuthCommand(): Promise<void> {
     console.log(chalk.green(`Saved ${CORE_PROVIDERS[provider].displayName} key to macOS Keychain.`));
 }
 
-async function chooseModel(defaultModel: string): Promise<string> {
-    const { model } = await inquirer.prompt<{ model: string }>([
-        {
-            type: "input",
-            name: "model",
-            message: "Model name",
-            default: defaultModel,
-        },
-    ]);
-
-    return model.trim() || defaultModel;
-}
-
-async function chooseProvider(defaultProvider: CoreProviderId): Promise<CoreProviderId> {
-    const { provider } = await inquirer.prompt<{ provider: CoreProviderId }>([
-        {
-            type: "list",
-            name: "provider",
-            message: "Choose a provider",
-            choices: CORE_PROVIDER_IDS.map((id) => ({
-                name: CORE_PROVIDERS[id].displayName,
-                value: id,
-            })),
-            default: defaultProvider,
-        },
-    ]);
-
-    return provider;
-}
-
 async function collectInput(): Promise<RunOptions> {
     const { prompt } = await inquirer.prompt<{ prompt: string }>([
         {
@@ -144,8 +194,8 @@ async function collectInput(): Promise<RunOptions> {
         return { prompt: "", provider: DEFAULT_PROVIDER, model: DEFAULT_MODELS[DEFAULT_PROVIDER] };
     }
 
-    const provider = await chooseProvider(DEFAULT_PROVIDER);
-    const model = await chooseModel(DEFAULT_MODELS[provider]);
+    const provider = await chooseProvider();
+    const model = await chooseModel(provider);
     return { prompt: trimmedPrompt, provider, model };
 }
 
