@@ -1,0 +1,21 @@
+# bettercue project-level bun configuration
+# See https://bun.com/docs/install
+
+[install]
+
+# Whether to install optionalDependencies
+optional = true
+
+# Whether to install devDependencies
+dev = true
+
+# Whether to install peerDependencies
+peer = true
+
+# Use isolated linker (pnpm-like) for strict dependency isolation
+# Prevents phantom dependencies — packages can only access their declared deps
+# This is already the default for new workspaces (configVersion >= 1)
+linker = "isolated"
+
+# Don't install in production mode by default
+production = false

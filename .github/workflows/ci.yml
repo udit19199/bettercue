@@ -1,0 +1,34 @@
+# bettercue CI — install, typecheck, test, and build
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  ci:
+    name: Install, typecheck, test, build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies (frozen lockfile)
+        run: bun ci
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Run tests
+        run: bun test
+
+      - name: Build extension (Chrome)
+        run: bun run extension:build
+
+      - name: Build extension (Firefox)
+        run: bun run extension:firefox
