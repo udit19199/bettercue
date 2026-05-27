@@ -18,6 +18,16 @@ jobs:
       - name: Install bun
         uses: oven-sh/setup-bun@v2
 
+      - name: Debug — show lockfile changes
+        run: |
+          cp bun.lock /tmp/bun.lock.before
+          bun install 2>&1
+          echo "=== LOCKFILE DIFF ==="
+          git diff /tmp/bun.lock.before bun.lock || true
+          echo "=== END DIFF ==="
+          # restore original lockfile for subsequent steps
+          cp /tmp/bun.lock.before bun.lock
+
       - name: Install dependencies (frozen lockfile)
         run: bun ci
 
