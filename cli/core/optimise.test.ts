@@ -9,18 +9,21 @@ mock.module("../../shared/providers/index.ts", () => {
 
   const listProviderModels = mock(async () => ["model-a", "model-b"]);
   const generateQuestionsWithProvider = mock(async () => ({ questions: [] }));
+  const buildEnhancedPrompt = mock((original: string) => original);
 
   return {
     CORE_PROVIDER_IDS: ["ollama", "openai", "anthropic", "google"],
     CORE_PROVIDERS: {
-      ollama: { displayName: "Ollama", defaultModel: "deepseek-r1:latest", requiresApiKey: false },
-      openai: { displayName: "OpenAI", defaultModel: "gpt-4.1-mini", requiresApiKey: true },
-      anthropic: { displayName: "Anthropic", defaultModel: "claude-3-5-sonnet-latest", requiresApiKey: true },
-      google: { displayName: "Google Gemini", defaultModel: "gemini-2.5-flash", requiresApiKey: true },
+      ollama: { displayName: "Ollama", defaultModel: "deepseek-r1:latest", requiresApiKey: false, apiKeyEnvVar: null },
+      openai: { displayName: "OpenAI", defaultModel: "gpt-4.1-mini", requiresApiKey: true, apiKeyEnvVar: "OPENAI_API_KEY" },
+      anthropic: { displayName: "Anthropic", defaultModel: "claude-3-5-sonnet-latest", requiresApiKey: true, apiKeyEnvVar: "ANTHROPIC_API_KEY" },
+      google: { displayName: "Google Gemini", defaultModel: "gemini-2.5-flash", requiresApiKey: true, apiKeyEnvVar: "GOOGLE_API_KEY" },
     },
+    DEFAULT_PROVIDER: "ollama",
     optimizeWithProvider,
     listProviderModels,
     generateQuestionsWithProvider,
+    buildEnhancedPrompt,
   };
 });
 
@@ -36,6 +39,11 @@ mock.module("./modelCache.ts", () => ({
   saveCachedModels: mock(async () => undefined),
 }));
 
+mock.module("./persistence.ts", () => ({
+  loadConfig: mock(() => ({})),
+  saveConfig: mock(() => undefined),
+}));
+
 mock.module("@inquirer/search", () => ({
   default: mock(async ({ source }: { source: (input?: string) => Promise<Array<{ value: string }>> }) => {
     const choices = await source("");
@@ -47,7 +55,14 @@ const optimizeModule = await import("./optimise.ts");
 
 describe("resolveApiKey", () => {
   it("prefers keychain on macOS", () => {
-    expect(optimizeModule.resolveApiKey("openai")).toBe("from-keychain");
+    // The function only calls loadProviderKey on darwin; mock platform to test that path
+    const origPlatform = Object.getOwnPropertyDescriptor(process, "platform");
+    Object.defineProperty(process, "platform", { value: "darwin" });
+    try {
+      expect(optimizeModule.resolveApiKey("openai")).toBe("from-keychain");
+    } finally {
+      Object.defineProperty(process, "platform", origPlatform!);
+    }
   });
 
   it("returns null for ollama", () => {
