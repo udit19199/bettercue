@@ -36,7 +36,7 @@ async function selectKeyProvider(message = "Choose a provider"): Promise<CorePro
     const providers = listKeyProviders();
     const { provider } = await inquirer.prompt<{ provider: CoreProviderId }>([
         {
-            type: "list",
+            type: "select",
             name: "provider",
             message,
             choices: providers.map((providerId) => ({
@@ -53,7 +53,7 @@ async function selectKeyProvider(message = "Choose a provider"): Promise<CorePro
 async function chooseProvider(): Promise<CoreProviderId> {
     const { provider } = await inquirer.prompt<{ provider: CoreProviderId }>([
         {
-            type: "list",
+            type: "select",
             name: "provider",
             message: "Choose a provider",
             choices: CORE_PROVIDER_IDS.map((id) => ({
@@ -150,7 +150,7 @@ async function runAuthCommand(): Promise<void> {
 
     const { action } = await inquirer.prompt<{ action: "save" | "remove" | "status" }>([
         {
-            type: "list",
+            type: "select",
             name: "action",
             message: "Keychain action",
             choices: [
@@ -254,7 +254,7 @@ async function askQuestionCLI(question: Question): Promise<string | null> {
         ];
         const { answer } = await inquirer.prompt<{ answer: string }>([
             {
-                type: "list",
+                type: "select",
                 name: "answer",
                 message: question.question,
                 choices,
