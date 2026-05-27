@@ -2,12 +2,7 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 
-import type { CoreProviderId } from "../../shared/providers/index.ts";
-
-type CachedModels = {
-    items: string[];
-    fetchedAt: number;
-};
+import type { CoreProviderId, CachedModels } from "../../shared/providers/index.ts";
 
 type CacheState = Record<string, CachedModels>;
 

@@ -1,6 +1,8 @@
 import { loadKey, loadLastUsedModel, saveLastUsedModel, loadPreciseTokensSetting, type ProviderId } from "../shared/storage/keys";
 import { CORE_PROVIDERS } from "@shared/providers";
 import { enrichModelsWithPricing, type ModelInfo } from "@shared/providers/pricing";
+import { heuristicTokens } from "../shared/tokens/estimator";
+import type { Question } from "@shared/providers";
 
 // ─── DOM refs ─────────────────────────────────────────────────────────────────
 
@@ -28,12 +30,6 @@ const questionsSkipEl = document.getElementById("questions-skip") as HTMLSpanEle
 const questionsSubmitEl = document.getElementById("questions-submit") as HTMLButtonElement;
 
 // ─── State ────────────────────────────────────────────────────────────────────
-
-type Question = {
-  id: string;
-  question: string;
-  answer?: string;
-};
 
 let currentModels: ModelInfo[] = [];
 let filteredModels: ModelInfo[] = [];
@@ -79,6 +75,7 @@ function renderModelOptions(models: ModelInfo[]) {
   models.forEach((model) => {
     const option = document.createElement("div");
     option.className = "model-option";
+    option.dataset.modelId = model.id;
     if (model.id === selectedModel) {
       option.classList.add("selected");
     }
@@ -132,12 +129,10 @@ function selectModel(modelId: string) {
 
   // Update selected state in dropdown
   const options = modelDropdownEl.querySelectorAll(".model-option");
-  options.forEach((opt, idx) => {
-    if (filteredModels[idx]?.id === modelId) {
-      opt.classList.add("selected");
-    } else {
-      opt.classList.remove("selected");
-    }
+  options.forEach((opt) => {
+    const el = opt as HTMLElement;
+    const match = el.dataset.modelId === modelId;
+    el.classList.toggle("selected", match);
   });
 }
 
@@ -178,7 +173,7 @@ modelInputEl.addEventListener("keydown", (e) => {
   } else if (e.key === "Enter") {
     // Select first filtered result or use typed value
     if (filteredModels.length > 0) {
-      selectModel(filteredModels[0].id);
+      selectModel(filteredModels[0]!.id);
     } else if (modelInputEl.value.trim()) {
       selectedModel = modelInputEl.value.trim();
     }
@@ -199,7 +194,7 @@ modelInputEl.addEventListener("keydown", (e) => {
       newIndex = Math.max(currentIndex - 1, 0);
     }
     if (filteredModels[newIndex]) {
-      selectModel(filteredModels[newIndex].id);
+      selectModel(filteredModels[newIndex]!.id);
     }
   }
 });
@@ -219,25 +214,13 @@ async function fetchAndPopulateModels(provider: ProviderId, desiredModel: string
   currentModels = [];
   filteredModels = [];
 
-  // Try to read cached models
-  const cacheKey = `models.${provider}`;
-  const cached = await new Promise<{ items?: string[]; fetchedAt?: number } | null>((res) =>
-    chrome.storage.local.get([cacheKey], (r) => res(r[cacheKey] ?? null))
-  );
-  const now = Date.now();
-
-  let modelIds: string[] = [];
-  if (cached?.items && cached.fetchedAt && now - cached.fetchedAt < 1000 * 60 * 60) {
-    modelIds = cached.items;
-  } else {
-    // Ask background to list models
-    modelIds = await new Promise<string[]>((res) => {
-      chrome.runtime.sendMessage({ type: "list-models", payload: { provider } }, (resp) => {
-        if (resp?.ok && Array.isArray(resp.models)) return res(resp.models);
-        return res([]);
-      });
+  // Delegate model listing to the background worker (handles its own caching)
+  const modelIds = await new Promise<string[]>((res) => {
+    chrome.runtime.sendMessage({ type: "list-models", payload: { provider } }, (resp) => {
+      if (resp?.ok && Array.isArray(resp.models)) return res(resp.models);
+      return res([]);
     });
-  }
+  });
 
   // Enrich with pricing information
   currentModels = enrichModelsWithPricing(provider, modelIds);
@@ -248,7 +231,7 @@ async function fetchAndPopulateModels(provider: ProviderId, desiredModel: string
   if (hasDesired) {
     selectedModel = desiredModel;
   } else if (currentModels.length > 0) {
-    selectedModel = currentModels[0].id;
+    selectedModel = currentModels[0]!.id;
   } else {
     selectedModel = desiredModel || DEFAULT_MODELS[provider] || "";
   }
@@ -292,10 +275,6 @@ providerEl.addEventListener("change", async () => {
 
 // ─── Token estimate (heuristic; updates on input change) ─────────────────────
 
-function heuristicTokens(text: string): number {
-  return Math.max(1, Math.round(text.length / 4));
-}
-
 function updateTokenEstimate() {
   const count = heuristicTokens(promptEl.value);
   tokenEstEl.textContent = `~${count} tokens`;
@@ -317,6 +296,71 @@ function hideQuestionsSection() {
   originalPromptForQuestions = "";
 }
 
+/**
+ * Render a single question input based on its type.
+ */
+function renderQuestionItem(question: Question): HTMLDivElement {
+  const item = document.createElement("div");
+  item.className = "question-item";
+
+  const label = document.createElement("div");
+  label.className = "question-label";
+  label.textContent = question.question;
+  item.appendChild(label);
+
+  if (question.type === "text") {
+    const input = document.createElement("textarea");
+    input.className = "question-input question-input-text";
+    input.placeholder = "Your answer...";
+    input.rows = 2;
+    input.dataset.questionId = question.id;
+    item.appendChild(input);
+  } else if (question.type === "select") {
+    const select = document.createElement("select");
+    select.className = "question-input question-input-select";
+    select.dataset.questionId = question.id;
+
+    const skipOption = document.createElement("option");
+    skipOption.value = "";
+    skipOption.textContent = "— Skip —";
+    select.appendChild(skipOption);
+
+    for (const opt of question.options ?? []) {
+      const option = document.createElement("option");
+      option.value = opt;
+      option.textContent = opt;
+      select.appendChild(option);
+    }
+
+    item.appendChild(select);
+  } else if (question.type === "multi") {
+    const group = document.createElement("div");
+    group.className = "question-checkbox-group";
+    group.dataset.questionId = question.id;
+
+    for (const opt of question.options ?? []) {
+      const labelEl = document.createElement("label");
+      labelEl.className = "question-checkbox-label";
+
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.className = "question-checkbox-input";
+      checkbox.value = opt;
+
+      const textSpan = document.createElement("span");
+      textSpan.textContent = opt;
+
+      labelEl.appendChild(checkbox);
+      labelEl.appendChild(textSpan);
+      group.appendChild(labelEl);
+    }
+
+    item.appendChild(group);
+  }
+
+  return item;
+}
+
 function renderQuestions(questions: Question[]) {
   questionsLoadingEl.hidden = true;
 
@@ -333,24 +377,10 @@ function renderQuestions(questions: Question[]) {
 
   questionsActionsEl.hidden = false;
 
-  questions.forEach((q) => {
-    const item = document.createElement("div");
-    item.className = "question-item";
-
-    const label = document.createElement("div");
-    label.className = "question-label";
-    label.textContent = q.question;
-
-    const input = document.createElement("textarea");
-    input.className = "question-input";
-    input.placeholder = "Your answer...";
-    input.rows = 2;
-    input.dataset.questionId = q.id;
-
-    item.appendChild(label);
-    item.appendChild(input);
+  for (const q of questions) {
+    const item = renderQuestionItem(q);
     questionsContainerEl.appendChild(item);
-  });
+  }
 }
 
 async function fetchQuestions(prompt: string): Promise<Question[]> {
@@ -371,12 +401,7 @@ async function fetchQuestions(prompt: string): Promise<Question[]> {
       },
       (resp) => {
         if (resp?.ok && Array.isArray(resp.questions)) {
-          resolve(
-            resp.questions.map((q: string, idx: number) => ({
-              id: `q-${idx}`,
-              question: q,
-            }))
-          );
+          resolve(resp.questions as Question[]);
         } else {
           // No questions or error - proceed without questions
           resolve([]);
@@ -386,30 +411,70 @@ async function fetchQuestions(prompt: string): Promise<Question[]> {
   });
 }
 
+/**
+ * Collect all answers from the rendered question inputs.
+ * Returns a map of questionId → answer string.
+ * Unanswered questions are omitted.
+ */
 function collectAnswers(): Record<string, string> {
   const answers: Record<string, string> = {};
-  const inputs = questionsContainerEl.querySelectorAll(".question-input") as NodeListOf<HTMLTextAreaElement>;
-  inputs.forEach((input) => {
+
+  // Text inputs
+  const textInputs = questionsContainerEl.querySelectorAll(
+    ".question-input-text"
+  ) as NodeListOf<HTMLTextAreaElement>;
+  textInputs.forEach((input) => {
     const qId = input.dataset.questionId;
     if (qId && input.value.trim()) {
       answers[qId] = input.value.trim();
     }
   });
+
+  // Select inputs
+  const selects = questionsContainerEl.querySelectorAll(
+    ".question-input-select"
+  ) as NodeListOf<HTMLSelectElement>;
+  selects.forEach((select) => {
+    const qId = select.dataset.questionId;
+    if (qId && select.value) {
+      answers[qId] = select.value;
+    }
+  });
+
+  // Checkbox groups
+  const checkboxGroups = questionsContainerEl.querySelectorAll(
+    ".question-checkbox-group"
+  ) as NodeListOf<HTMLDivElement>;
+  checkboxGroups.forEach((group) => {
+    const qId = group.dataset.questionId;
+    const checked = Array.from(
+      group.querySelectorAll('input[type="checkbox"]:checked')
+    ) as HTMLInputElement[];
+    if (qId && checked.length > 0) {
+      answers[qId] = checked.map((cb) => cb.value).join(", ");
+    }
+  });
+
   return answers;
 }
 
-function buildEnhancedPrompt(): string {
+/**
+ * Build an enhanced prompt by appending answered questions as context.
+ * Uses the shared buildEnhancedPrompt function imported via background worker.
+ */
+function buildEnhancedPromptLocally(): string {
   const answers = collectAnswers();
-  let enhanced = originalPromptForQuestions;
-
-  // Append answered questions as context
   const answeredQuestions = currentQuestions.filter((q) => answers[q.id]);
-  if (answeredQuestions.length > 0) {
-    enhanced += "\n\n[Additional context from clarifying questions:]\n";
-    answeredQuestions.forEach((q) => {
-      enhanced += `Q: ${q.question}\nA: ${answers[q.id]}\n`;
-    });
+
+  if (answeredQuestions.length === 0) {
+    return originalPromptForQuestions;
   }
+
+  let enhanced = originalPromptForQuestions;
+  enhanced += "\n\n[Additional context from clarifying questions:]\n";
+  answeredQuestions.forEach((q) => {
+    enhanced += `Q: ${q.question}\nA: ${answers[q.id]}\n`;
+  });
 
   return enhanced;
 }
@@ -421,7 +486,7 @@ async function performOptimization(enhancedPrompt?: string) {
   if (!original) return;
 
   const provider = providerEl.value as ProviderId;
-  const model = selectedModel || DEFAULT_MODELS[provider];
+  const model = selectedModel || DEFAULT_MODELS[provider] || "";
   const preset = presetEl.value;
 
   const apiKey = needsApiKey(provider) ? await loadKey(provider) : null;
@@ -508,7 +573,7 @@ questionsSkipEl.addEventListener("click", () => {
 });
 
 questionsSubmitEl.addEventListener("click", () => {
-  const enhanced = buildEnhancedPrompt();
+  const enhanced = buildEnhancedPromptLocally();
   performOptimization(enhanced);
 });
 

@@ -2,11 +2,12 @@ import chalk from "chalk";
 import inquirer from "inquirer";
 import search from "@inquirer/search";
 
-import { DEFAULT_MODELS, DEFAULT_PROVIDER, PROVIDER_API_KEY_ENV, SYSTEM_PROMPT } from "./config.ts";
+import { SYSTEM_PROMPT } from "./config.ts";
 import { clearCachedModels, loadCachedModels, saveCachedModels } from "./modelCache.ts";
 import { loadProviderKey, removeProviderKey, saveProviderKey } from "./keychain.ts";
-import { CORE_PROVIDER_IDS, CORE_PROVIDERS, listProviderModels, optimizeWithProvider } from "../../shared/providers/index.ts";
-import type { CoreProviderId } from "../../shared/providers/index.ts";
+import { loadConfig, saveConfig } from "./persistence.ts";
+import { CORE_PROVIDER_IDS, CORE_PROVIDERS, DEFAULT_PROVIDER, listProviderModels, optimizeWithProvider, generateQuestionsWithProvider, buildEnhancedPrompt } from "../../shared/providers/index.ts";
+import type { CoreProviderId, Question } from "../../shared/providers/index.ts";
 
 export type OptimizeOptions = {
     provider: CoreProviderId;
@@ -18,6 +19,10 @@ type RunOptions = {
     provider: CoreProviderId;
     model: string;
 };
+
+function getOllamaBaseUrl(provider: CoreProviderId): string | undefined {
+    return provider === "ollama" ? process.env.OLLAMA_BASE_URL ?? undefined : undefined;
+}
 
 function printBanner() {
     console.log(chalk.bold.cyan("bettercue"), chalk.gray("- multi-provider prompt optimizer\n"));
@@ -64,13 +69,25 @@ async function chooseProvider(): Promise<CoreProviderId> {
 
 async function fetchModels(provider: CoreProviderId): Promise<string[]> {
     const apiKey = resolveApiKey(provider);
-    const baseUrl = provider === "ollama" ? process.env.OLLAMA_BASE_URL ?? undefined : undefined;
+    const baseUrl = getOllamaBaseUrl(provider);
     const models = await listProviderModels({ provider, apiKey, baseUrl });
     return models.sort((left, right) => left.localeCompare(right));
 }
 
 async function chooseModel(provider: CoreProviderId): Promise<string> {
-    const baseUrl = provider === "ollama" ? process.env.OLLAMA_BASE_URL ?? undefined : undefined;
+    const baseUrl = getOllamaBaseUrl(provider);
+
+    // Before fetching models, check API key availability for paid providers
+    const envName = CORE_PROVIDERS[provider].apiKeyEnvVar;
+    if (envName && !resolveApiKey(provider)) {
+        throw new Error(
+            `No API key configured for ${CORE_PROVIDERS[provider].displayName}. ` +
+            (process.platform === "darwin"
+                ? `Run \`bun run cli auth\` or set ${envName}.`
+                : `Set the ${envName} environment variable.`)
+        );
+    }
+
     const cachedModels = await loadCachedModels(provider, baseUrl);
     const models = cachedModels ?? (await fetchAndCacheModels(provider));
 
@@ -117,7 +134,7 @@ async function chooseModel(provider: CoreProviderId): Promise<string> {
 }
 
 async function fetchAndCacheModels(provider: CoreProviderId): Promise<string[]> {
-    const baseUrl = provider === "ollama" ? process.env.OLLAMA_BASE_URL ?? undefined : undefined;
+    const baseUrl = getOllamaBaseUrl(provider);
     const models = await fetchModels(provider);
     await saveCachedModels(provider, models, baseUrl);
     return models;
@@ -147,9 +164,17 @@ async function runAuthCommand(): Promise<void> {
 
     if (action === "status") {
         for (const provider of listKeyProviders()) {
-            const hasKey = !!loadProviderKey(provider);
-            const label = `${CORE_PROVIDERS[provider].displayName}: ${hasKey ? "saved" : "missing"}`;
-            console.log(hasKey ? chalk.green(label) : chalk.gray(label));
+            const envName = CORE_PROVIDERS[provider].apiKeyEnvVar ?? "";
+            const keychainKey = loadProviderKey(provider);
+            const envKey = process.env[envName];
+            const hasKeychain = !!keychainKey;
+            const hasEnv = !!envKey;
+            const parts: string[] = [];
+            if (hasKeychain) parts.push("keychain");
+            if (hasEnv) parts.push("env var");
+            const status = parts.length > 0 ? parts.join(" + ") : "missing";
+            const label = `${CORE_PROVIDERS[provider].displayName}: ${status}`;
+            console.log(hasKeychain || hasEnv ? chalk.green(label) : chalk.gray(label));
         }
         return;
     }
@@ -180,6 +205,126 @@ async function runAuthCommand(): Promise<void> {
     console.log(chalk.green(`Saved ${CORE_PROVIDERS[provider].displayName} key to macOS Keychain.`));
 }
 
+// ─── Persistence ──────────────────────────────────────────────────────────────
+
+async function resolveProviderAndModel(): Promise<{ provider: CoreProviderId; model: string }> {
+    const config = loadConfig();
+
+    if (config.lastProvider && config.lastModel) {
+        const displayName = CORE_PROVIDERS[config.lastProvider]?.displayName ?? config.lastProvider;
+        const { change } = await inquirer.prompt<{ change: boolean }>([
+            {
+                type: "confirm",
+                name: "change",
+                message: `Using ${displayName} / ${config.lastModel}. Change?`,
+                default: false,
+            },
+        ]);
+
+        if (!change) {
+            return { provider: config.lastProvider, model: config.lastModel };
+        }
+    }
+
+    const provider = await chooseProvider();
+    const model = await chooseModel(provider);
+    return { provider, model };
+}
+
+// ─── Clarifying questions flow ────────────────────────────────────────────────
+
+async function askQuestionCLI(question: Question): Promise<string | null> {
+    const skipChoice = question.required ? [] : [{ name: "— Skip —", value: "__skip__" }];
+
+    if (question.type === "text") {
+        const { answer } = await inquirer.prompt<{ answer: string }>([
+            {
+                type: "input",
+                name: "answer",
+                message: question.question,
+            },
+        ]);
+        return answer.trim() || null;
+    }
+
+    if (question.type === "select") {
+        const choices = [
+            ...skipChoice,
+            ...(question.options?.map((opt) => ({ name: opt, value: opt })) ?? []),
+        ];
+        const { answer } = await inquirer.prompt<{ answer: string }>([
+            {
+                type: "list",
+                name: "answer",
+                message: question.question,
+                choices,
+            },
+        ]);
+        return answer === "__skip__" ? null : answer;
+    }
+
+    if (question.type === "multi") {
+        const { answer } = await inquirer.prompt<{ answer: string[] }>([
+            {
+                type: "checkbox",
+                name: "answer",
+                message: question.question,
+                choices: question.options?.map((opt) => ({ name: opt, value: opt })) ?? [],
+            },
+        ]);
+        return answer.length > 0 ? answer.join(", ") : null;
+    }
+
+    return null;
+}
+
+async function runQuestionsFlow(provider: CoreProviderId, model: string, prompt: string): Promise<string> {
+    const apiKey = resolveApiKey(provider);
+
+    console.log(chalk.gray("\nAnalyzing your prompt for clarifying questions..."));
+
+    let questions: Question[];
+    try {
+        const response = await generateQuestionsWithProvider({
+            provider,
+            prompt,
+            model,
+            apiKey: apiKey ?? undefined,
+        });
+        questions = response.questions;
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(chalk.yellow(`Could not generate clarifying questions: ${message}`));
+        console.log(chalk.gray("Proceeding with the original prompt."));
+        return prompt;
+    }
+
+    if (questions.length === 0) {
+        console.log(chalk.gray("No clarifying questions needed. Proceeding to optimization."));
+        return prompt;
+    }
+
+    console.log(chalk.cyan("\nClarifying Questions:\n"));
+
+    const answers: Record<string, string> = {};
+
+    for (const question of questions) {
+        const answer = await askQuestionCLI(question);
+        if (answer !== null) {
+            answers[question.id] = answer;
+        }
+    }
+
+    if (Object.keys(answers).length === 0) {
+        console.log(chalk.gray("No answers provided. Proceeding with the original prompt."));
+        return prompt;
+    }
+
+    return buildEnhancedPrompt(prompt, questions, answers);
+}
+
+// ─── Prompt input ─────────────────────────────────────────────────────────────
+
 async function collectInput(): Promise<RunOptions> {
     const { prompt } = await inquirer.prompt<{ prompt: string }>([
         {
@@ -191,12 +336,12 @@ async function collectInput(): Promise<RunOptions> {
 
     const trimmedPrompt = prompt.trim();
     if (!trimmedPrompt) {
-        return { prompt: "", provider: DEFAULT_PROVIDER, model: DEFAULT_MODELS[DEFAULT_PROVIDER] };
+        return { prompt: "", provider: DEFAULT_PROVIDER, model: CORE_PROVIDERS[DEFAULT_PROVIDER].defaultModel };
     }
 
-    const provider = await chooseProvider();
-    const model = await chooseModel(provider);
-    return { prompt: trimmedPrompt, provider, model };
+    // For backward compat with the old flow, keep this function but it's only
+    // used for the prompt now. Provider + model are resolved earlier.
+    return { prompt: trimmedPrompt, provider: DEFAULT_PROVIDER, model: CORE_PROVIDERS[DEFAULT_PROVIDER].defaultModel };
 }
 
 function friendlyKeyMissingMessage(provider: CoreProviderId): string {
@@ -204,7 +349,7 @@ function friendlyKeyMissingMessage(provider: CoreProviderId): string {
         return "Ollama does not need an API key.";
     }
 
-    const envName = provider === "openai" ? "OPENAI_API_KEY" : provider === "anthropic" ? "ANTHROPIC_API_KEY" : "GOOGLE_API_KEY";
+    const envName = CORE_PROVIDERS[provider].apiKeyEnvVar;
     if (process.platform === "darwin") {
         return `No key saved for ${CORE_PROVIDERS[provider].displayName}. Run \`bun run cli auth\` or set ${envName}.`;
     }
@@ -213,7 +358,7 @@ function friendlyKeyMissingMessage(provider: CoreProviderId): string {
 }
 
 export function resolveApiKey(provider: CoreProviderId): string | null {
-    const envName = PROVIDER_API_KEY_ENV[provider];
+    const envName = CORE_PROVIDERS[provider].apiKeyEnvVar;
     if (!envName) {
         return null;
     }
@@ -262,30 +407,45 @@ export async function runCli(): Promise<void> {
 
         printBanner();
 
-        const { prompt, provider, model } = await collectInput();
-        if (!prompt) {
-            console.log(chalk.yellow("No prompt provided. Exiting."));
-            return;
-        }
+        // Step 1: Resolve provider and model (with persistence)
+        const { provider, model } = await resolveProviderAndModel();
 
+        // Step 2: Check API key early for paid providers
         if (provider !== "ollama") {
-            const keyPresent = !!loadProviderKey(provider);
-            if (!keyPresent && !process.env[
-                provider === "openai" ? "OPENAI_API_KEY" : provider === "anthropic" ? "ANTHROPIC_API_KEY" : "GOOGLE_API_KEY"
-            ]) {
+            const apiKey = resolveApiKey(provider);
+            if (!apiKey) {
                 console.log(chalk.yellow(`\n${friendlyKeyMissingMessage(provider)}`));
-                if (process.platform === "darwin") {
-                    console.log(chalk.gray(`Run \`./bettercue auth\` to save it securely in macOS Keychain.`));
-                }
                 return;
             }
         }
 
-        console.log(chalk.gray(`\nOptimising with ${provider}/${model}...`));
-        const response = await optimisePrompt(prompt, { provider, model });
+        // Step 3: Collect the prompt
+        const { prompt: rawPrompt } = await inquirer.prompt<{ prompt: string }>([
+            {
+                type: "editor",
+                name: "prompt",
+                message: "Enter the prompt to optimise",
+            },
+        ]);
+
+        const trimmedPrompt = rawPrompt.trim();
+        if (!trimmedPrompt) {
+            console.log(chalk.yellow("No prompt provided. Exiting."));
+            return;
+        }
+
+        // Step 4: Generate and answer clarifying questions
+        const enhancedPrompt = await runQuestionsFlow(provider, model, trimmedPrompt);
+
+        // Step 5: Optimize the (possibly enhanced) prompt
+        console.log(chalk.gray(`\nOptimising with ${CORE_PROVIDERS[provider].displayName}/${model}...`));
+        const response = await optimisePrompt(enhancedPrompt, { provider, model });
 
         console.log(chalk.green("\nOptimised prompt:\n"));
         console.log(response);
+
+        // Step 6: Persist the chosen provider and model
+        saveConfig({ lastProvider: provider, lastModel: model });
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         console.error(chalk.red(`\nError: ${message}`));

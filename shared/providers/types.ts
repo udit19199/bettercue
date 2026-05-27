@@ -1,3 +1,7 @@
+import type { Question } from "../questions/types";
+
+export type { Question };
+
 export type CoreProviderId = "ollama" | "openai" | "anthropic" | "google";
 
 export type PresetId = "concise" | "precision" | "creative";
@@ -33,6 +37,15 @@ export type GenerateQuestionsRequest = {
 };
 
 export type GenerateQuestionsResponse = {
-  questions: string[];
+  questions: Question[];
   raw?: unknown;
+};
+
+/**
+ * Shape of a cached model list with a timestamp for staleness checks.
+ * Used by both the CLI (JSON file) and extension (chrome.storage.local) caches.
+ */
+export type CachedModels = {
+  items: string[];
+  fetchedAt: number;
 };

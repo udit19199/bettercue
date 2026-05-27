@@ -5,7 +5,7 @@
   "description": "Optimize and rewrite prompts for LLMs",
   "action": { "default_popup": "popup/popup.html", "default_title": "bettercue" },
   "options_page": "options/options.html",
-  "permissions": ["storage", "contextMenus", "scripting", "activeTab", "alarms", "clipboardWrite"],
+  "permissions": ["storage", "contextMenus", "scripting", "activeTab", "clipboardWrite"],
   "host_permissions": [
     "http://localhost:11434/*",
     "http://127.0.0.1:11434/*",

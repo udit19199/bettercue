@@ -8,14 +8,12 @@
         "better-cue": "cli.ts"
     },
     "devDependencies": {
-        "@types/bun": "latest"
-    },
-    "peerDependencies": {
-        "typescript": "^5"
+        "@types/bun": "latest",
+        "typescript": "catalog:"
     },
     "dependencies": {
         "chalk": "^5.6.2",
-        "inquirer": "^12.10.0",
-        "@inquirer/search": "^3.2.0"
+        "inquirer": "^14.0.0",
+        "@inquirer/search": "^4.2.0"
     }
 }

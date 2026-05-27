@@ -83,7 +83,7 @@ export async function saveLastUsedModel(
 
 /** Remove ALL stored provider keys and settings. */
 export async function clearAllKeys(): Promise<void> {
-  await storageRemove(["providers"]);
+  await storageRemove(["providers", "preciseTokens"]);
 }
 
 /** Read the preciseTokens user preference. */

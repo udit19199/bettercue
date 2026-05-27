@@ -7,7 +7,7 @@
  */
 
 import type { ProviderAdapter, RewriteOptions } from "../shared/providers/provider";
-import { generateQuestionsWithProvider, type CoreProviderId } from "@shared/providers";
+import { generateQuestionsWithProvider, type CoreProviderId, type CachedModels, type Question } from "@shared/providers";
 
 export type BackgroundMessage =
   | {
@@ -38,13 +38,10 @@ export type BackgroundMessage =
 export type BackgroundReply =
   | { ok: true; result: unknown }
   | { ok: true; models: string[] }
-  | { ok: true; questions: string[] }
+  | { ok: true; questions: Question[] }
   | { ok: false; error: string };
 
-type CachedModels = {
-  items: string[];
-  fetchedAt: number;
-};
+
 
 export type BackgroundDeps = {
   getAdapter(id: string): ProviderAdapter | null;
@@ -55,6 +52,8 @@ export type BackgroundDeps = {
 };
 
 const MODELS_CACHE_TTL_MS = 60 * 60 * 1000;
+
+const CORE_PROVIDER_IDS = new Set<CoreProviderId>(["ollama", "openai", "anthropic", "google"]);
 
 function normalizeError(error: unknown): string {
   if (error instanceof Error) {
@@ -134,6 +133,11 @@ export function createBackgroundMessageFlow(deps: BackgroundDeps) {
     const adapter = deps.getAdapter(adapterId);
     if (!adapter) {
       throw new Error(`Adapter not found: ${adapterId}`);
+    }
+
+    // Questions generation is only supported for core providers
+    if (!CORE_PROVIDER_IDS.has(adapterId as CoreProviderId)) {
+      throw new Error(`Questions not supported for provider: ${adapterId}`);
     }
 
     // Map adapter ID to provider ID for the shared function

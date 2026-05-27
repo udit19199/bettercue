@@ -1,7 +1,4 @@
-type CachedModels = {
-  items: string[];
-  fetchedAt: number;
-};
+import type { CachedModels } from "@shared/providers";
 
 function getCacheKey(providerId: string): string {
   return `models.${providerId}`;

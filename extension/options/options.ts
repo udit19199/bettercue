@@ -5,6 +5,7 @@ import {
   loadPreciseTokensSetting,
   savePreciseTokensSetting,
   type ProviderId,
+  type ProviderStorageEntry,
 } from "../shared/storage/keys";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -85,14 +86,10 @@ function wireProvider(provider: ProviderId) {
   });
 
   clearBtn.addEventListener("click", async () => {
-    // clear only this provider's key by saving empty string? No — save null
-    // We re-use saveKey with empty then overwrite with null via clearAllKeys pattern
-    // Simplest: read storage, overwrite just this provider
-    await saveKey(provider, "");
-    // Write null explicitly
+    // Read current providers, null out just this provider's key
     await new Promise<void>((res) =>
       chrome.storage.local.get(["providers"], (result) => {
-        const providers = result.providers ?? {};
+        const providers: Record<string, ProviderStorageEntry> = (result.providers as Record<string, ProviderStorageEntry>) ?? {};
         providers[provider] = { apiKey: null, lastUsedModel: providers[provider]?.lastUsedModel ?? null };
         chrome.storage.local.set({ providers }, res);
       })
@@ -138,7 +135,6 @@ function wireClearAll() {
     )
       return;
     await clearAllKeys();
-    await chrome.storage.local.remove(["preciseTokens"]);
     await loadAllKeys();
     el<HTMLInputElement>("precise-tokens").checked = false;
     setGlobal("All keys and settings cleared.", "ok");

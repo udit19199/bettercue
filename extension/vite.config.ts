@@ -1,7 +1,6 @@
 import { defineConfig } from "vite";
 import { crx } from "@crxjs/vite-plugin";
 import wasm from "vite-plugin-wasm";
-import topLevelAwait from "vite-plugin-top-level-await";
 import { resolve } from "path";
 import manifest from "./manifest.json";
 
@@ -17,8 +16,8 @@ import manifest from "./manifest.json";
 //   - Hot-module reload of the popup during `dev` (watch) mode
 //   - Correct service-worker module bundling for MV3
 //
-// vite-plugin-wasm + vite-plugin-top-level-await handle tiktoken's
-// WASM binary correctly for both popup and background contexts.
+// vite-plugin-wasm handles tiktoken's WASM binary correctly.
+// (vite-plugin-top-level-await was removed — Vite 8 / rolldown handles TLA natively.)
 
 export default defineConfig(({ mode }) => {
   const isFirefox = mode === "firefox";
@@ -27,7 +26,6 @@ export default defineConfig(({ mode }) => {
     root: ".",
     plugins: [
       wasm(),
-      topLevelAwait(),
       crx({ manifest }),
     ],
 
