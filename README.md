@@ -13,6 +13,11 @@ Install all dependencies from the root (single `bun install` covers both package
 bun install
 ```
 
+A [`bunfig.toml`](./bunfig.toml) at the project root codifies defaults:
+- **`isolated` linker** — strict dependency isolation (pnpm-like) prevents phantom dependencies
+- All dependency types (`dev`, `optional`, `peer`) are installed
+- Production mode is off by default
+
 ## Requirements
 
 - Bun
@@ -122,11 +127,34 @@ bun run extension:firefox
 - **OpenAI/Anthropic/Google** — Requires API keys configured in the extension options. Model lists are fetched and cached for 1 hour.
 - **Mock** — Offline testing mode with no API calls.
 
+### Run tests
+
+```bash
+bun test           # all workspace tests
+bun test cli/core/optimise.test.ts   # single file
+```
+
+### Frozen-lockfile install (CI)
+
+```bash
+bun ci             # fails if package.json doesn't match bun.lock
+bun run ci         # same thing via package.json script
+```
+
 ### Typecheck all packages
 
 ```bash
 bun run typecheck
 ```
+
+## CI
+
+The repository includes a [GitHub Actions workflow](.github/workflows/ci.yml) that runs on every push and pull request to `main`:
+
+1. **`bun ci`** — installs exact versions from `bun.lock` (reproducible builds)
+2. **`bun run typecheck`** — TypeScript type-checking across both workspaces
+3. **`bun test`** — all workspace tests
+4. **Extension builds** — Chrome and Firefox production builds
 
 ## Model Pricing
 
