@@ -8,7 +8,7 @@ function ensureMacOS() {
     }
 }
 
-function runSecurity(args: string[]): { ok: boolean; stdout: string; stderr: string } {
+async function runSecurity(args: string[]): Promise<{ ok: boolean; stdout: string; stderr: string }> {
     const result = Bun.spawnSync({
         cmd: ["security", ...args],
         stdout: "pipe",
@@ -25,7 +25,7 @@ function runSecurity(args: string[]): { ok: boolean; stdout: string; stderr: str
     };
 }
 
-export function saveProviderKey(provider: CoreProviderId, apiKey: string): void {
+export async function saveProviderKey(provider: CoreProviderId, apiKey: string): Promise<void> {
     ensureMacOS();
 
     const normalized = apiKey.trim();
@@ -33,7 +33,7 @@ export function saveProviderKey(provider: CoreProviderId, apiKey: string): void 
         throw new Error("API key cannot be empty.");
     }
 
-    const result = runSecurity([
+    const result = await runSecurity([
         "add-generic-password",
         "-a",
         provider,
@@ -49,10 +49,10 @@ export function saveProviderKey(provider: CoreProviderId, apiKey: string): void 
     }
 }
 
-export function loadProviderKey(provider: CoreProviderId): string | null {
+export async function loadProviderKey(provider: CoreProviderId): Promise<string | null> {
     ensureMacOS();
 
-    const result = runSecurity([
+    const result = await runSecurity([
         "find-generic-password",
         "-a",
         provider,
@@ -69,10 +69,10 @@ export function loadProviderKey(provider: CoreProviderId): string | null {
     return key || null;
 }
 
-export function removeProviderKey(provider: CoreProviderId): boolean {
+export async function removeProviderKey(provider: CoreProviderId): Promise<boolean> {
     ensureMacOS();
 
-    const result = runSecurity([
+    const result = await runSecurity([
         "delete-generic-password",
         "-a",
         provider,

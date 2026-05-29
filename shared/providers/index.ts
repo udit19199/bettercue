@@ -21,38 +21,30 @@ export type {
   Question,
 };
 
-// Re-export from the questions module for direct use
-export { buildEnhancedPrompt } from "../questions/enhance";
-export { parseQuestionsResponse } from "../questions/parse";
+// ─── Provider implementation registry ────────────────────────────────────────
+
+type ProviderImpl = {
+  optimize: (request: OptimizeRequest) => Promise<OptimizeResponse>;
+  listModels: (request: ListModelsRequest) => Promise<string[]>;
+};
+
+const PROVIDER_IMPLS: Record<CoreProviderId, ProviderImpl> = {
+  ollama: { optimize: optimizeWithOllama, listModels: listOllamaProviderModels },
+  openai: { optimize: optimizeWithOpenAI, listModels: listOpenAIModels },
+  anthropic: { optimize: optimizeWithAnthropic, listModels: listAnthropicModels },
+  google: { optimize: optimizeWithGoogle, listModels: listGoogleModels },
+};
 
 export async function optimizeWithProvider(request: OptimizeRequest): Promise<OptimizeResponse> {
-  switch (request.provider) {
-    case "ollama":
-      return await optimizeWithOllama(request);
-    case "openai":
-      return await optimizeWithOpenAI(request);
-    case "anthropic":
-      return await optimizeWithAnthropic(request);
-    case "google":
-      return await optimizeWithGoogle(request);
-    default:
-      throw new Error(`Unsupported provider: ${request.provider}`);
-  }
+  const impl = PROVIDER_IMPLS[request.provider];
+  if (!impl) throw new Error(`Unsupported provider: ${request.provider}`);
+  return await impl.optimize(request);
 }
 
 export async function listProviderModels(request: ListModelsRequest): Promise<string[]> {
-  switch (request.provider) {
-    case "ollama":
-      return await listOllamaProviderModels(request);
-    case "openai":
-      return await listOpenAIModels(request);
-    case "anthropic":
-      return await listAnthropicModels(request);
-    case "google":
-      return await listGoogleModels(request);
-    default:
-      throw new Error(`Unsupported provider: ${request.provider}`);
-  }
+  const impl = PROVIDER_IMPLS[request.provider];
+  if (!impl) throw new Error(`Unsupported provider: ${request.provider}`);
+  return await impl.listModels(request);
 }
 
 /**
@@ -66,13 +58,9 @@ export async function generateQuestionsWithProvider(
   request: GenerateQuestionsRequest
 ): Promise<GenerateQuestionsResponse> {
   const optimizeRequest: OptimizeRequest = {
-    provider: request.provider,
-    prompt: request.prompt,
-    model: request.model,
-    apiKey: request.apiKey,
+    ...request,
     system: QUESTIONS_SYSTEM_PROMPT,
     maxOutputTokens: 512,
-    baseUrl: request.baseUrl,
   };
 
   const response = await optimizeWithProvider(optimizeRequest);

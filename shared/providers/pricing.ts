@@ -1,3 +1,5 @@
+import type { CoreProviderId } from "./types";
+
 /**
  * Model pricing information for various AI providers.
  * Prices are per 1M tokens (input/output) in USD.
@@ -106,7 +108,7 @@ export const OLLAMA_PRICING: ProviderPricing = {};
 /**
  * Combined pricing lookup by provider
  */
-export const PROVIDER_PRICING: Record<string, ProviderPricing> = {
+export const PROVIDER_PRICING: Record<CoreProviderId, ProviderPricing> = {
   openai: OPENAI_PRICING,
   anthropic: ANTHROPIC_PRICING,
   google: GOOGLE_PRICING,
@@ -121,7 +123,7 @@ export function getModelPricing(
   provider: string,
   modelId: string
 ): ModelPricing | null {
-  const providerPricing = PROVIDER_PRICING[provider];
+  const providerPricing = PROVIDER_PRICING[provider as CoreProviderId];
   if (!providerPricing) return null;
 
   // Direct lookup
@@ -129,8 +131,11 @@ export function getModelPricing(
     return providerPricing[modelId];
   }
 
-  // Try to find a matching prefix (for dated model versions)
-  for (const [key, pricing] of Object.entries(providerPricing)) {
+  // Try to find a matching prefix (for dated model versions).
+  // Sort by key length descending so "gpt-4o-mini" is checked before "gpt-4o"
+  // to avoid a shorter prefix matching a longer model ID.
+  const sorted = Object.entries(providerPricing as Record<string, ModelPricing>).sort(([a], [b]) => b.length - a.length);
+  for (const [key, pricing] of sorted) {
     if (modelId.startsWith(key) || key.startsWith(modelId)) {
       return pricing;
     }

@@ -3,7 +3,7 @@
  *
  * The prompt instructs the model to analyze the user's prompt and return
  * 1–3 structured clarifying questions in a JSON format that can be
- * rendered by both the CLI (inquirer) and the extension (DOM).
+ * rendered by the CLI (inquirer).
  */
 
 export const QUESTIONS_SYSTEM_PROMPT = `You are an expert prompt analyst. Your job is to analyze the user's prompt and identify 1-3 clarifying questions that would help improve its effectiveness.

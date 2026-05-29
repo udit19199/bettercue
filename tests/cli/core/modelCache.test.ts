@@ -1,20 +1,21 @@
-import { afterEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { mkdir, rm } from "node:fs/promises";
 import { resolve } from "node:path";
 
-let homeDir = resolve(process.cwd(), "tmp-home");
+const tempDirs = new Set<string>();
 
 async function loadFreshCacheModule() {
-    const cachePath = `./modelCache.ts?${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const cachePath = `../../../cli/core/modelCache.ts?t=${Date.now()}-${Math.random().toString(16).slice(2)}`;
     return await import(cachePath);
 }
 
 async function withTempHome<T>(fn: () => Promise<T>): Promise<T> {
     const previousHome = process.env.HOME;
     const uniqueSuffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    homeDir = resolve(process.cwd(), `tmp-home-${uniqueSuffix}`);
-    process.env.HOME = homeDir;
-    await mkdir(homeDir, { recursive: true });
+    const tempDir = resolve(process.cwd(), `tmp-home-${uniqueSuffix}`);
+    process.env.HOME = tempDir;
+    tempDirs.add(tempDir);
+    await mkdir(tempDir, { recursive: true });
 
     try {
         return await fn();
@@ -27,8 +28,15 @@ async function withTempHome<T>(fn: () => Promise<T>): Promise<T> {
     }
 }
 
+beforeEach(() => {
+    tempDirs.clear();
+});
+
 afterEach(async () => {
-    await rm(homeDir, { recursive: true, force: true });
+    for (const dir of tempDirs) {
+        await rm(dir, { recursive: true, force: true });
+    }
+    tempDirs.clear();
 });
 
 describe("model cache", () => {
@@ -50,6 +58,25 @@ describe("model cache", () => {
 
             expect(await cache.loadCachedModels("ollama", "http://localhost:11434")).toEqual(["model-a"]);
             expect(await cache.loadCachedModels("ollama", "http://127.0.0.1:11434")).toEqual(["model-b"]);
+        });
+    });
+
+    it("returns null for unknown provider", async () => {
+        await withTempHome(async () => {
+            const cache = await loadFreshCacheModule();
+            const cached = await cache.loadCachedModels("openai");
+            expect(cached).toBeNull();
+        });
+    });
+
+    it("clears cached models for a provider", async () => {
+        await withTempHome(async () => {
+            const cache = await loadFreshCacheModule();
+            await cache.saveCachedModels("openai", ["gpt-4o"]);
+            await cache.clearCachedModels("openai");
+
+            const cached = await cache.loadCachedModels("openai");
+            expect(cached).toBeNull();
         });
     });
 });

@@ -1,4 +1,11 @@
-import { SYSTEM_PROMPT as OLLAMA_SYSTEM_PROMPT } from "../ollama/index";
+/**
+ * Default system prompt used when no preset is selected.
+ */
+export const DEFAULT_SYSTEM_PROMPT =
+`You are Better-Cue, a prompt optimizer.
+Rewrite the user's prompt into a clear, direct, high-quality prompt that preserves intent.
+Do not ask follow-up questions.
+Output only the improved prompt without explanations.`;
 
 export const SYSTEM_PROMPTS: Record<string, string> = {
   concise:
@@ -9,12 +16,10 @@ export const SYSTEM_PROMPTS: Record<string, string> = {
     "You are a senior prompt engineer with a flair for engaging language. Rewrite the user's prompt to be vivid, imaginative, and compelling while preserving the core intent. Output only the improved prompt - no explanation.",
 };
 
-export const DEFAULT_SYSTEM_PROMPT = OLLAMA_SYSTEM_PROMPT.trim();
-
-export function getSystemPrompt(preset?: string, fallback = DEFAULT_SYSTEM_PROMPT): string {
+export function getSystemPrompt(preset?: string): string {
   if (!preset) {
-    return fallback;
+    return DEFAULT_SYSTEM_PROMPT;
   }
 
-  return SYSTEM_PROMPTS[preset] ?? fallback;
+  return SYSTEM_PROMPTS[preset] ?? DEFAULT_SYSTEM_PROMPT;
 }

@@ -43,7 +43,6 @@ export type GenerateQuestionsResponse = {
 
 /**
  * Shape of a cached model list with a timestamp for staleness checks.
- * Used by both the CLI (JSON file) and extension (chrome.storage.local) caches.
  */
 export type CachedModels = {
   items: string[];

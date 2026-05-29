@@ -2,27 +2,18 @@ import chalk from "chalk";
 import inquirer from "inquirer";
 import search from "@inquirer/search";
 
-import { SYSTEM_PROMPT } from "./config.ts";
+import { SYSTEM_PROMPT, getOllamaBaseUrl } from "./config.ts";
 import { clearCachedModels, loadCachedModels, saveCachedModels } from "./modelCache.ts";
 import { loadProviderKey, removeProviderKey, saveProviderKey } from "./keychain.ts";
 import { loadConfig, saveConfig } from "./persistence.ts";
-import { CORE_PROVIDER_IDS, CORE_PROVIDERS, DEFAULT_PROVIDER, listProviderModels, optimizeWithProvider, generateQuestionsWithProvider, buildEnhancedPrompt } from "../../shared/providers/index.ts";
+import { CORE_PROVIDER_IDS, CORE_PROVIDERS, DEFAULT_PROVIDER, listProviderModels, optimizeWithProvider, generateQuestionsWithProvider } from "../../shared/providers/index.ts";
+import { buildEnhancedPrompt } from "../../shared/questions/index.ts";
 import type { CoreProviderId, Question } from "../../shared/providers/index.ts";
 
 export type OptimizeOptions = {
     provider: CoreProviderId;
     model: string;
 };
-
-type RunOptions = {
-    prompt: string;
-    provider: CoreProviderId;
-    model: string;
-};
-
-function getOllamaBaseUrl(provider: CoreProviderId): string | undefined {
-    return provider === "ollama" ? process.env.OLLAMA_BASE_URL ?? undefined : undefined;
-}
 
 function printBanner() {
     console.log(chalk.bold.cyan("bettercue"), chalk.gray("- multi-provider prompt optimizer\n"));
@@ -68,18 +59,18 @@ async function chooseProvider(): Promise<CoreProviderId> {
 }
 
 async function fetchModels(provider: CoreProviderId): Promise<string[]> {
-    const apiKey = resolveApiKey(provider);
-    const baseUrl = getOllamaBaseUrl(provider);
+    const apiKey = await resolveApiKey(provider);
+    const baseUrl = getOllamaBaseUrl();
     const models = await listProviderModels({ provider, apiKey, baseUrl });
     return models.sort((left, right) => left.localeCompare(right));
 }
 
 async function chooseModel(provider: CoreProviderId): Promise<string> {
-    const baseUrl = getOllamaBaseUrl(provider);
+    const baseUrl = getOllamaBaseUrl();
 
     // Before fetching models, check API key availability for paid providers
     const envName = CORE_PROVIDERS[provider].apiKeyEnvVar;
-    if (envName && !resolveApiKey(provider)) {
+    if (envName && !(await resolveApiKey(provider))) {
         throw new Error(
             `No API key configured for ${CORE_PROVIDERS[provider].displayName}. ` +
             (process.platform === "darwin"
@@ -88,53 +79,54 @@ async function chooseModel(provider: CoreProviderId): Promise<string> {
         );
     }
 
-    const cachedModels = await loadCachedModels(provider, baseUrl);
-    const models = cachedModels ?? (await fetchAndCacheModels(provider));
+    let models = await loadCachedModels(provider, baseUrl)
+        ?? await fetchAndCacheModels(provider);
 
     if (!models.length) {
         throw new Error(`No models found for ${CORE_PROVIDERS[provider].displayName}.`);
     }
 
-    const selected = await search<string | "__refresh__">({
-        message: `Choose a ${CORE_PROVIDERS[provider].displayName} model`,
-        source: async (input) => {
-            const query = (input ?? "").trim().toLowerCase();
-            const filtered = query
-                ? models.filter((model) => model.toLowerCase().includes(query))
-                : models;
+    while (true) {
+        const selected = await search<string | "__refresh__">({
+            message: `Choose a ${CORE_PROVIDERS[provider].displayName} model`,
+            source: async (input) => {
+                const query = (input ?? "").trim().toLowerCase();
+                const filtered = query
+                    ? models.filter((model) => model.toLowerCase().includes(query))
+                    : models;
 
-            const choices: Array<{ name: string; value: string; short: string }> = filtered.slice(0, 20).map((model) => ({
-                name: model,
-                value: model,
-                short: model,
-            }));
+                const choices: Array<{ name: string; value: string; short: string }> = filtered.slice(0, 20).map((model) => ({
+                    name: model,
+                    value: model,
+                    short: model,
+                }));
 
-            if (!query) {
-                choices.unshift({ name: "Refresh model list", value: "__refresh__", short: "Refresh model list" });
-            }
+                if (!query) {
+                    choices.unshift({ name: "Refresh model list", value: "__refresh__", short: "Refresh model list" });
+                }
 
-            if (!choices.length) {
-                return [{ name: "No matching models", value: "__none__", disabled: true }];
-            }
+                if (!choices.length) {
+                    return [{ name: "No matching models", value: "__none__", disabled: true }];
+                }
 
-            return choices;
-        },
-    });
+                return choices;
+            },
+        });
 
-    if (selected === "__refresh__") {
+        if (selected !== "__refresh__") {
+            return selected;
+        }
+
         await clearCachedModels(provider, baseUrl);
-        const refreshed = await fetchAndCacheModels(provider);
-        if (!refreshed.length) {
+        models = await fetchAndCacheModels(provider);
+        if (!models.length) {
             throw new Error(`No models found for ${CORE_PROVIDERS[provider].displayName}.`);
         }
-        return await chooseModel(provider);
     }
-
-    return selected;
 }
 
 async function fetchAndCacheModels(provider: CoreProviderId): Promise<string[]> {
-    const baseUrl = getOllamaBaseUrl(provider);
+    const baseUrl = getOllamaBaseUrl();
     const models = await fetchModels(provider);
     await saveCachedModels(provider, models, baseUrl);
     return models;
@@ -165,7 +157,7 @@ async function runAuthCommand(): Promise<void> {
     if (action === "status") {
         for (const provider of listKeyProviders()) {
             const envName = CORE_PROVIDERS[provider].apiKeyEnvVar ?? "";
-            const keychainKey = loadProviderKey(provider);
+            const keychainKey = await loadProviderKey(provider);
             const envKey = process.env[envName];
             const hasKeychain = !!keychainKey;
             const hasEnv = !!envKey;
@@ -182,7 +174,7 @@ async function runAuthCommand(): Promise<void> {
     const provider = await selectKeyProvider("Choose provider for Keychain");
 
     if (action === "remove") {
-        const removed = removeProviderKey(provider);
+        const removed = await removeProviderKey(provider);
         if (!removed) {
             console.log(chalk.yellow(`No saved key found for ${CORE_PROVIDERS[provider].displayName}.`));
             return;
@@ -201,28 +193,40 @@ async function runAuthCommand(): Promise<void> {
         },
     ]);
 
-    saveProviderKey(provider, apiKey);
+    await saveProviderKey(provider, apiKey);
     console.log(chalk.green(`Saved ${CORE_PROVIDERS[provider].displayName} key to macOS Keychain.`));
 }
 
 // ─── Persistence ──────────────────────────────────────────────────────────────
 
+async function confirmPersistedChoice(
+    provider: CoreProviderId,
+    model: string,
+): Promise<{ confirmed: true; provider: CoreProviderId; model: string } | { confirmed: false }> {
+    const displayName = CORE_PROVIDERS[provider]?.displayName ?? provider;
+    const { change } = await inquirer.prompt<{ change: boolean }>([
+        {
+            type: "confirm",
+            name: "change",
+            message: `Using ${displayName} / ${model}. Change?`,
+            default: false,
+        },
+    ]);
+
+    if (!change) {
+        return { confirmed: true, provider, model };
+    }
+
+    return { confirmed: false };
+}
+
 async function resolveProviderAndModel(): Promise<{ provider: CoreProviderId; model: string }> {
-    const config = loadConfig();
+    const config = await loadConfig();
 
     if (config.lastProvider && config.lastModel) {
-        const displayName = CORE_PROVIDERS[config.lastProvider]?.displayName ?? config.lastProvider;
-        const { change } = await inquirer.prompt<{ change: boolean }>([
-            {
-                type: "confirm",
-                name: "change",
-                message: `Using ${displayName} / ${config.lastModel}. Change?`,
-                default: false,
-            },
-        ]);
-
-        if (!change) {
-            return { provider: config.lastProvider, model: config.lastModel };
+        const result = await confirmPersistedChoice(config.lastProvider, config.lastModel);
+        if (result.confirmed) {
+            return { provider: result.provider, model: result.model };
         }
     }
 
@@ -279,7 +283,7 @@ async function askQuestionCLI(question: Question): Promise<string | null> {
 }
 
 async function runQuestionsFlow(provider: CoreProviderId, model: string, prompt: string): Promise<string> {
-    const apiKey = resolveApiKey(provider);
+    const apiKey = await resolveApiKey(provider);
 
     console.log(chalk.gray("\nAnalyzing your prompt for clarifying questions..."));
 
@@ -323,27 +327,6 @@ async function runQuestionsFlow(provider: CoreProviderId, model: string, prompt:
     return buildEnhancedPrompt(prompt, questions, answers);
 }
 
-// ─── Prompt input ─────────────────────────────────────────────────────────────
-
-async function collectInput(): Promise<RunOptions> {
-    const { prompt } = await inquirer.prompt<{ prompt: string }>([
-        {
-            type: "editor",
-            name: "prompt",
-            message: "Enter the prompt to optimise",
-        },
-    ]);
-
-    const trimmedPrompt = prompt.trim();
-    if (!trimmedPrompt) {
-        return { prompt: "", provider: DEFAULT_PROVIDER, model: CORE_PROVIDERS[DEFAULT_PROVIDER].defaultModel };
-    }
-
-    // For backward compat with the old flow, keep this function but it's only
-    // used for the prompt now. Provider + model are resolved earlier.
-    return { prompt: trimmedPrompt, provider: DEFAULT_PROVIDER, model: CORE_PROVIDERS[DEFAULT_PROVIDER].defaultModel };
-}
-
 function friendlyKeyMissingMessage(provider: CoreProviderId): string {
     if (provider === "ollama") {
         return "Ollama does not need an API key.";
@@ -357,14 +340,14 @@ function friendlyKeyMissingMessage(provider: CoreProviderId): string {
     return `No key saved for ${CORE_PROVIDERS[provider].displayName}. Set ${envName} and try again.`;
 }
 
-export function resolveApiKey(provider: CoreProviderId): string | null {
+export async function resolveApiKey(provider: CoreProviderId): Promise<string | null> {
     const envName = CORE_PROVIDERS[provider].apiKeyEnvVar;
     if (!envName) {
         return null;
     }
 
     if (process.platform === "darwin") {
-        const keychainKey = loadProviderKey(provider);
+        const keychainKey = await loadProviderKey(provider);
         if (keychainKey) {
             return keychainKey;
         }
@@ -381,7 +364,7 @@ export function resolveApiKey(provider: CoreProviderId): string | null {
 }
 
 export async function optimisePrompt(prompt: string, options: OptimizeOptions): Promise<string> {
-    const apiKey = resolveApiKey(options.provider);
+    const apiKey = await resolveApiKey(options.provider);
     if (!apiKey && options.provider !== "ollama") {
         throw new Error(`No API key configured for ${options.provider}.`);
     }
@@ -412,7 +395,7 @@ export async function runCli(): Promise<void> {
 
         // Step 2: Check API key early for paid providers
         if (provider !== "ollama") {
-            const apiKey = resolveApiKey(provider);
+            const apiKey = await resolveApiKey(provider);
             if (!apiKey) {
                 console.log(chalk.yellow(`\n${friendlyKeyMissingMessage(provider)}`));
                 return;
@@ -445,7 +428,7 @@ export async function runCli(): Promise<void> {
         console.log(response);
 
         // Step 6: Persist the chosen provider and model
-        saveConfig({ lastProvider: provider, lastModel: model });
+        await saveConfig({ lastProvider: provider, lastModel: model });
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         console.error(chalk.red(`\nError: ${message}`));

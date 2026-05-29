@@ -1,15 +1,10 @@
+import { DEFAULT_SYSTEM_PROMPT } from "../providers/prompts";
+
 const DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434";
 
 export const DEFAULT_OLLAMA_GENERATE_URL = `${DEFAULT_OLLAMA_BASE_URL}/api/generate`;
 export const DEFAULT_OLLAMA_TAGS_URL = `${DEFAULT_OLLAMA_BASE_URL}/api/tags`;
 export const DEFAULT_OLLAMA_MODEL = "deepseek-r1:latest";
-
-export const SYSTEM_PROMPT = `
-You are Better-Cue, a prompt optimizer.
-Rewrite the user's prompt into a clear, direct, high-quality prompt that preserves intent.
-Do not ask follow-up questions.
-Output only the improved prompt without explanations.
-`;
 
 export type OllamaGenerateOptions = {
   prompt: string;
@@ -106,7 +101,7 @@ export async function generateOllamaPrompt(options: OllamaGenerateOptions): Prom
   const body = {
     model: options.model ?? DEFAULT_OLLAMA_MODEL,
     prompt: options.prompt,
-    system: options.system ?? SYSTEM_PROMPT,
+    system: options.system ?? DEFAULT_SYSTEM_PROMPT,
     stream: true,
   };
 
