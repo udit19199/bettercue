@@ -16,7 +16,9 @@ export type OptimizeOptions = {
 };
 
 function printBanner() {
-    console.log(chalk.bold.cyan("bettercue"), chalk.gray("- multi-provider prompt optimizer\n"));
+    console.log();
+    console.log(chalk.bold.cyan("bettercue"), chalk.gray("- multi-provider prompt optimizer"));
+    console.log();
 }
 
 function listKeyProviders(): CoreProviderId[] {
@@ -155,6 +157,7 @@ async function runAuthCommand(): Promise<void> {
     ]);
 
     if (action === "status") {
+        console.log();
         for (const provider of listKeyProviders()) {
             const envName = CORE_PROVIDERS[provider].apiKeyEnvVar ?? "";
             const keychainKey = await loadProviderKey(provider);
@@ -285,7 +288,8 @@ async function askQuestionCLI(question: Question): Promise<string | null> {
 async function runQuestionsFlow(provider: CoreProviderId, model: string, prompt: string): Promise<string> {
     const apiKey = await resolveApiKey(provider);
 
-    console.log(chalk.gray("\nAnalyzing your prompt for clarifying questions..."));
+    console.log();
+    console.log(chalk.gray("Analyzing your prompt for clarifying questions..."));
 
     let questions: Question[];
     try {
@@ -308,14 +312,19 @@ async function runQuestionsFlow(provider: CoreProviderId, model: string, prompt:
         return prompt;
     }
 
-    console.log(chalk.cyan("\nClarifying Questions:\n"));
+    console.log();
+    console.log(chalk.cyan.underline("Clarifying Questions"));
+    console.log();
 
     const answers: Record<string, string> = {};
 
-    for (const question of questions) {
-        const answer = await askQuestionCLI(question);
+    for (let i = 0; i < questions.length; i++) {
+        if (i > 0) {
+            console.log(); // breathing room between questions
+        }
+        const answer = await askQuestionCLI(questions[i]!);
         if (answer !== null) {
-            answers[question.id] = answer;
+            answers[questions[i]!.id] = answer;
         }
     }
 
@@ -380,6 +389,48 @@ export async function optimisePrompt(prompt: string, options: OptimizeOptions): 
     return response.text;
 }
 
+// ─── Clipboard ────────────────────────────────────────────────────────────────
+
+function copyToClipboard(text: string): boolean {
+    try {
+        if (process.platform === "darwin") {
+            const proc = Bun.spawnSync(["pbcopy"], { stdin: Buffer.from(text) });
+            return proc.success;
+        }
+        if (process.platform === "linux") {
+            const proc = Bun.spawnSync(["xclip", "-selection", "clipboard"], { stdin: Buffer.from(text) });
+            return proc.success;
+        }
+        if (process.platform === "win32") {
+            const proc = Bun.spawnSync(["clip"], { stdin: Buffer.from(text) });
+            return proc.success;
+        }
+        return false;
+    } catch {
+        return false;
+    }
+}
+
+async function offerCopyToClipboard(text: string): Promise<void> {
+    const { copy } = await inquirer.prompt<{ copy: boolean }>([
+        {
+            type: "confirm",
+            name: "copy",
+            message: "Copy optimised prompt to clipboard?",
+            default: true,
+        },
+    ]);
+
+    if (!copy) return;
+
+    const ok = copyToClipboard(text);
+    if (ok) {
+        console.log(chalk.green("Copied to clipboard."));
+    } else {
+        console.log(chalk.yellow("Could not copy to clipboard. Make sure pbcopy (macOS), xclip (Linux), or clip (Windows) is available."));
+    }
+}
+
 export async function runCli(): Promise<void> {
     try {
         const command = process.argv[2];
@@ -421,11 +472,18 @@ export async function runCli(): Promise<void> {
         const enhancedPrompt = await runQuestionsFlow(provider, model, trimmedPrompt);
 
         // Step 5: Optimize the (possibly enhanced) prompt
-        console.log(chalk.gray(`\nOptimising with ${CORE_PROVIDERS[provider].displayName}/${model}...`));
+        console.log();
+        console.log(chalk.gray(`Optimising with ${CORE_PROVIDERS[provider].displayName}/${model}...`));
         const response = await optimisePrompt(enhancedPrompt, { provider, model });
 
-        console.log(chalk.green("\nOptimised prompt:\n"));
-        console.log(response);
+        console.log();
+        console.log(chalk.green.underline("Optimised prompt"));
+        console.log();
+        console.log(chalk.white(response));
+        console.log();
+
+        // Offer to copy to clipboard
+        await offerCopyToClipboard(response);
 
         // Step 6: Persist the chosen provider and model
         await saveConfig({ lastProvider: provider, lastModel: model });
