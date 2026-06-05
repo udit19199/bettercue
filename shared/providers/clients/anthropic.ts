@@ -1,5 +1,5 @@
 import { DEFAULT_SYSTEM_PROMPT } from "../prompts";
-import type { ListModelsRequest, OptimizeRequest, OptimizeResponse } from "../types";
+import type { ListModelsRequest, OptimizeRequest, OptimizeResponse, Usage } from "../types";
 
 const ANTHROPIC_BASE_URL = "https://api.anthropic.com";
 const ANTHROPIC_ENDPOINT = `${ANTHROPIC_BASE_URL}/v1/messages`;
@@ -51,13 +51,19 @@ export async function optimizeWithAnthropic(request: OptimizeRequest): Promise<O
 
   const data = (await response.json()) as {
     content?: Array<{ type?: string; text?: string }>;
+    usage?: { input_tokens?: number; output_tokens?: number };
   };
+
+  // Extract token usage from the response
+  const usage: Usage | undefined = data.usage
+    ? { inputTokens: data.usage.input_tokens ?? 0, outputTokens: data.usage.output_tokens ?? 0 }
+    : undefined;
 
   const content = data.content;
   if (Array.isArray(content)) {
     const textBlock = content.find((block) => block?.type === "text" && typeof block.text === "string");
     if (textBlock?.text?.trim()) {
-      return { text: textBlock.text.trim(), raw: data };
+      return { text: textBlock.text.trim(), usage, raw: data };
     }
   }
 

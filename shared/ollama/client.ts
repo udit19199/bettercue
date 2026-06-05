@@ -24,12 +24,20 @@ function classifyHttpError(url: string, status: number, bodyText: string): Error
   return new Error(`Ollama error ${status} at ${url}: ${bodyText.slice(0, 200)}`);
 }
 
-async function readOllamaStream(body: ReadableStream<Uint8Array>): Promise<string> {
+type OllamaStreamResult = {
+  text: string;
+  promptEvalCount?: number;
+  evalCount?: number;
+};
+
+async function readOllamaStream(body: ReadableStream<Uint8Array>): Promise<OllamaStreamResult> {
   const decoder = new TextDecoder();
   const reader = body.getReader();
   let buffer = "";
   let output = "";
   let sawDone = false;
+  let promptEvalCount: number | undefined;
+  let evalCount: number | undefined;
 
   try {
     while (true) {
@@ -46,28 +54,52 @@ async function readOllamaStream(body: ReadableStream<Uint8Array>): Promise<strin
 
         if (!line) continue;
 
-        const data = JSON.parse(line) as { response?: string; done?: boolean; error?: string };
+        const data = JSON.parse(line) as {
+          response?: string;
+          done?: boolean;
+          error?: string;
+          prompt_eval_count?: number;
+          eval_count?: number;
+        };
         if (typeof data.error === "string" && data.error) {
           throw new Error(`Ollama error: ${data.error}`);
         }
         if (typeof data.response === "string") {
           output += data.response;
         }
+        if (typeof data.prompt_eval_count === "number") {
+          promptEvalCount = data.prompt_eval_count;
+        }
+        if (typeof data.eval_count === "number") {
+          evalCount = data.eval_count;
+        }
         if (data.done) {
           sawDone = true;
-          return output.trim();
+          return { text: output.trim(), promptEvalCount, evalCount };
         }
       }
     }
 
     const tail = `${buffer}${decoder.decode()}`.trim();
     if (tail) {
-      const data = JSON.parse(tail) as { response?: string; done?: boolean; error?: string };
+      const data = JSON.parse(tail) as {
+        response?: string;
+        done?: boolean;
+        error?: string;
+        prompt_eval_count?: number;
+        eval_count?: number;
+      };
       if (typeof data.error === "string" && data.error) {
         throw new Error(`Ollama error: ${data.error}`);
       }
       if (typeof data.response === "string") {
         output += data.response;
+      }
+      if (typeof data.prompt_eval_count === "number") {
+        promptEvalCount = data.prompt_eval_count;
+      }
+      if (typeof data.eval_count === "number") {
+        evalCount = data.eval_count;
       }
       if (data.done) {
         sawDone = true;
@@ -78,13 +110,18 @@ async function readOllamaStream(body: ReadableStream<Uint8Array>): Promise<strin
       throw new Error("Ollama returned an empty response.");
     }
 
-    return output.trim();
+    return { text: output.trim(), promptEvalCount, evalCount };
   } finally {
     reader.releaseLock();
   }
 }
 
-export async function generateOllamaPrompt(options: OllamaGenerateOptions): Promise<string> {
+export type OllamaGenerateResult = {
+  text: string;
+  usage?: { inputTokens: number; outputTokens: number };
+};
+
+export async function generateOllamaPrompt(options: OllamaGenerateOptions): Promise<OllamaGenerateResult> {
   const url = options.url ?? DEFAULT_OLLAMA_GENERATE_URL;
   const controller = new AbortController();
   const signal = options.signal;
@@ -124,7 +161,13 @@ export async function generateOllamaPrompt(options: OllamaGenerateOptions): Prom
       throw new Error(`Ollama returned no response body from ${url}.`);
     }
 
-    return await readOllamaStream(response.body);
+    const result = await readOllamaStream(response.body);
+    return {
+      text: result.text,
+      usage: result.promptEvalCount !== undefined && result.evalCount !== undefined
+        ? { inputTokens: result.promptEvalCount, outputTokens: result.evalCount }
+        : undefined,
+    };
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
       throw new Error(`Timed out connecting to Ollama at ${url}.`);

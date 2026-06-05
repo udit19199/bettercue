@@ -1,5 +1,5 @@
 import { DEFAULT_SYSTEM_PROMPT } from "../prompts";
-import type { ListModelsRequest, OptimizeRequest, OptimizeResponse } from "../types";
+import type { ListModelsRequest, OptimizeRequest, OptimizeResponse, Usage } from "../types";
 
 const OPENAI_BASE_URL = "https://api.openai.com";
 const RESPONSES_ENDPOINT = `${OPENAI_BASE_URL}/v1/responses`;
@@ -54,10 +54,16 @@ export async function optimizeWithOpenAI(request: OptimizeRequest): Promise<Opti
       type?: string;
       content?: Array<{ type?: string; text?: string }>;
     }>;
+    usage?: { input_tokens?: number; output_tokens?: number };
   };
 
+  // Extract token usage from the response
+  const usage: Usage | undefined = data.usage
+    ? { inputTokens: data.usage.input_tokens ?? 0, outputTokens: data.usage.output_tokens ?? 0 }
+    : undefined;
+
   if (typeof data.output_text === "string" && data.output_text.trim()) {
-    return { text: data.output_text.trim(), raw: data };
+    return { text: data.output_text.trim(), usage, raw: data };
   }
 
   if (Array.isArray(data.output)) {
@@ -65,7 +71,7 @@ export async function optimizeWithOpenAI(request: OptimizeRequest): Promise<Opti
       if (item?.type === "message" && Array.isArray(item.content)) {
         for (const block of item.content) {
           if (block?.type === "output_text" && typeof block.text === "string" && block.text.trim()) {
-            return { text: block.text.trim(), raw: data };
+            return { text: block.text.trim(), usage, raw: data };
           }
         }
       }

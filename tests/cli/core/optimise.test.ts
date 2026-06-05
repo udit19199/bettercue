@@ -170,11 +170,11 @@ describe("optimisePrompt", () => {
     originalFetch = globalThis.fetch;
     globalThis.fetch = mock(async () => new Response(stream, { status: 200 })) as unknown as typeof fetch;
 
-    const text = await optimizeModule.optimisePrompt("make this better", {
+    const response = await optimizeModule.optimisePrompt("make this better", {
       provider: "ollama",
       model: "deepseek-r1:latest",
     });
-    expect(text).toBe("optimised prompt");
+    expect(response.text).toBe("optimised prompt");
   });
 
   it("throws when no API key for paid provider", async () => {

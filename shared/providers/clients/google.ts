@@ -1,5 +1,5 @@
 import { DEFAULT_SYSTEM_PROMPT } from "../prompts";
-import type { ListModelsRequest, OptimizeRequest, OptimizeResponse } from "../types";
+import type { ListModelsRequest, OptimizeRequest, OptimizeResponse, Usage } from "../types";
 
 const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models";
 
@@ -58,14 +58,20 @@ export async function optimizeWithGoogle(request: OptimizeRequest): Promise<Opti
         parts?: Array<{ text?: string }>;
       };
     }>;
+    usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
   };
+
+  // Extract token usage from the response
+  const usage: Usage | undefined = data.usageMetadata
+    ? { inputTokens: data.usageMetadata.promptTokenCount ?? 0, outputTokens: data.usageMetadata.candidatesTokenCount ?? 0 }
+    : undefined;
 
   const candidate = Array.isArray(data.candidates) ? data.candidates[0] : null;
   const parts = candidate?.content?.parts;
   if (Array.isArray(parts)) {
     const textPart = parts.find((part) => typeof part?.text === "string" && part.text.trim());
     if (textPart?.text?.trim()) {
-      return { text: textPart.text.trim(), raw: data };
+      return { text: textPart.text.trim(), usage, raw: data };
     }
   }
 

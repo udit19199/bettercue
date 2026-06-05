@@ -5,11 +5,13 @@ import { optimizeWithOllama, listOllamaProviderModels } from "./clients/ollama";
 import { optimizeWithOpenAI, listOpenAIModels } from "./clients/openai";
 import { DEFAULT_SYSTEM_PROMPT, getSystemPrompt } from "./prompts";
 import { QUESTIONS_SYSTEM_PROMPT } from "../questions/systemPrompt";
+import { calculateCost } from "./pricing";
 import { parseQuestionsResponse } from "../questions/parse";
-import type { CachedModels, CoreProviderId, ListModelsRequest, OptimizeRequest, OptimizeResponse, GenerateQuestionsRequest, GenerateQuestionsResponse, Question } from "./types";
+import type { CachedModels, CoreProviderId, ListModelsRequest, OptimizeRequest, OptimizeResponse, GenerateQuestionsRequest, GenerateQuestionsResponse, Question, Usage } from "./types";
 
 export { CORE_PROVIDERS, CORE_PROVIDER_IDS, DEFAULT_PROVIDER };
 export { DEFAULT_SYSTEM_PROMPT, getSystemPrompt };
+export { calculateCost };
 export type {
   CoreProviderId,
   CachedModels,
@@ -19,6 +21,7 @@ export type {
   GenerateQuestionsRequest,
   GenerateQuestionsResponse,
   Question,
+  Usage,
 };
 
 // ─── Provider implementation registry ────────────────────────────────────────

@@ -1,4 +1,4 @@
-import type { CoreProviderId } from "./types";
+import type { CoreProviderId, Usage } from "./types";
 
 /**
  * Model pricing information for various AI providers.
@@ -202,4 +202,40 @@ export function enrichModelsWithPricing(
       pricing,
     };
   });
+}
+
+/**
+ * Calculate the cost of an API call based on token usage and model pricing.
+ * Returns the total cost in USD and a human-readable label.
+ */
+export function calculateCost(
+  provider: string,
+  modelId: string,
+  usage: Usage
+): { cost: number; label: string } {
+  if (provider === "ollama") {
+    return { cost: 0, label: "Free (local)" };
+  }
+
+  const pricing = getModelPricing(provider, modelId);
+  if (!pricing) {
+    return { cost: 0, label: "Pricing unknown" };
+  }
+
+  const inputCost = (usage.inputTokens / 1_000_000) * pricing.inputPer1M;
+  const outputCost = (usage.outputTokens / 1_000_000) * pricing.outputPer1M;
+  const totalCost = inputCost + outputCost;
+
+  return {
+    cost: totalCost,
+    label: formatCost(totalCost),
+  };
+}
+
+function formatCost(cost: number): string {
+  if (cost === 0) return "$0.00";
+  if (cost < 0.001) return `$${cost.toFixed(6)}`;
+  if (cost < 0.01) return `$${cost.toFixed(5)}`;
+  if (cost < 1) return `$${cost.toFixed(4)}`;
+  return `$${cost.toFixed(2)}`;
 }

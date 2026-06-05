@@ -17,8 +17,14 @@ export type OptimizeRequest = {
   baseUrl?: string;
 };
 
+export type Usage = {
+  inputTokens: number;
+  outputTokens: number;
+};
+
 export type OptimizeResponse = {
   text: string;
+  usage?: Usage;
   raw?: unknown;
 };
 

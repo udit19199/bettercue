@@ -19,7 +19,7 @@ describe("generateOllamaPrompt", () => {
 
     try {
       const result = await generateOllamaPrompt({ prompt: "hello", system: DEFAULT_SYSTEM_PROMPT });
-      expect(result).toBe("hello world");
+      expect(result.text).toBe("hello world");
     } finally {
       globalThis.fetch = originalFetch;
     }

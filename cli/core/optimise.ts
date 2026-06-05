@@ -6,9 +6,9 @@ import { SYSTEM_PROMPT, getOllamaBaseUrl } from "./config.ts";
 import { clearCachedModels, loadCachedModels, saveCachedModels } from "./modelCache.ts";
 import { loadProviderKey, removeProviderKey, saveProviderKey } from "./keychain.ts";
 import { loadConfig, saveConfig } from "./persistence.ts";
-import { CORE_PROVIDER_IDS, CORE_PROVIDERS, DEFAULT_PROVIDER, listProviderModels, optimizeWithProvider, generateQuestionsWithProvider } from "../../shared/providers/index.ts";
+import { CORE_PROVIDER_IDS, CORE_PROVIDERS, DEFAULT_PROVIDER, listProviderModels, optimizeWithProvider, generateQuestionsWithProvider, calculateCost } from "../../shared/providers/index.ts";
 import { buildEnhancedPrompt } from "../../shared/questions/index.ts";
-import type { CoreProviderId, Question } from "../../shared/providers/index.ts";
+import type { CoreProviderId, OptimizeResponse, Question, Usage } from "../../shared/providers/index.ts";
 
 export type OptimizeOptions = {
     provider: CoreProviderId;
@@ -372,7 +372,7 @@ export async function resolveApiKey(provider: CoreProviderId): Promise<string | 
     return value;
 }
 
-export async function optimisePrompt(prompt: string, options: OptimizeOptions): Promise<string> {
+export async function optimisePrompt(prompt: string, options: OptimizeOptions): Promise<OptimizeResponse> {
     const apiKey = await resolveApiKey(options.provider);
     if (!apiKey && options.provider !== "ollama") {
         throw new Error(`No API key configured for ${options.provider}.`);
@@ -386,7 +386,7 @@ export async function optimisePrompt(prompt: string, options: OptimizeOptions): 
         apiKey: apiKey ?? undefined,
     });
 
-    return response.text;
+    return response;
 }
 
 // ─── Clipboard ────────────────────────────────────────────────────────────────
@@ -476,14 +476,20 @@ export async function runCli(): Promise<void> {
         console.log(chalk.gray(`Optimising with ${CORE_PROVIDERS[provider].displayName}/${model}...`));
         const response = await optimisePrompt(enhancedPrompt, { provider, model });
 
+        // Display cost if token usage is available
+        if (response.usage) {
+            const cost = calculateCost(provider, model, response.usage);
+            console.log(chalk.dim(`Tokens: ${response.usage.inputTokens} in / ${response.usage.outputTokens} out  •  Cost: ${cost.label}`));
+        }
+
         console.log();
         console.log(chalk.green.underline("Optimised prompt"));
         console.log();
-        console.log(chalk.white(response));
+        console.log(chalk.white(response.text));
         console.log();
 
         // Offer to copy to clipboard
-        await offerCopyToClipboard(response);
+        await offerCopyToClipboard(response.text);
 
         // Step 6: Persist the chosen provider and model
         await saveConfig({ lastProvider: provider, lastModel: model });
