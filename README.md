@@ -37,6 +37,13 @@ Live heuristic estimate (~1 token per 4 characters) shown during optimization.
 Before optimizing, the system can generate 1–3 intelligent questions to
 resolve ambiguity. Answers are appended as context into the final request.
 
+### Multi-line input
+The CLI includes a built-in multi-line text editor with full keyboard support:
+- **Shift+Enter** to insert new lines
+- **Arrow keys**, **Home/End**, **Option+Left/Right** for word navigation
+- **Bracketed paste** — pasted multi-line text inserts correctly
+- Line numbers and visual prefixes for clarity
+
 ### Model caching
 Fetched model lists are cached for 1 hour in `~/.bettercue/models-cache.json`.
 
@@ -90,17 +97,17 @@ The CLI opens a small terminal wizard:
 
 1. Resolves the last-used provider and model (or prompts you to choose)
 2. Checks API key availability for paid providers
-3. Prompts you to enter (or paste) a prompt
+3. Prompts you to enter (or paste) a prompt (supports multi-line via Shift+Enter)
 4. Optionally generates and lets you answer clarifying questions
 5. Rewrites the prompt through the selected LLM
-6. Prints the optimized result
+6. Prints the optimized result with token usage and cost estimate
 7. Persists your provider/model choice for next time
 
 ## Run tests
 
 ```bash
 bun test           # all tests
-bun test cli/core/optimise.test.ts   # single file
+bun test tests/cli/core/optimise.test.ts   # single file
 ```
 
 ### Frozen-lockfile install (CI)
@@ -120,12 +127,19 @@ bun run typecheck
 
 | Provider | Example Models | Approx. Input/Output per 1M tokens |
 |----------|----------------|-------------------------------------|
-| OpenAI | gpt-4o-mini | $0.15 / $0.60 |
+| OpenAI | gpt-5.4-mini | $0.20 / $0.80 |
+| OpenAI | gpt-4.1 | $2.00 / $8.00 |
 | OpenAI | gpt-4o | $2.50 / $10.00 |
-| Anthropic | claude-3-5-haiku | $0.80 / $4.00 |
+| OpenAI | o1 | $15.00 / $60.00 |
+| OpenAI | o3-mini | $1.10 / $4.40 |
+| Anthropic | claude-sonnet-4 | $3.00 / $15.00 |
 | Anthropic | claude-3-5-sonnet | $3.00 / $15.00 |
+| Anthropic | claude-3-5-haiku | $0.80 / $4.00 |
+| Anthropic | claude-3-opus | $15.00 / $75.00 |
+| Google | gemini-2.5-flash | $0.15 / $0.60 |
+| Google | gemini-2.5-pro | $1.25 / $10.00 |
 | Google | gemini-2.0-flash | $0.10 / $0.40 |
-| Ollama | (any) | Free (local) |
+| Ollama | deepseek-r1:latest | Free (local) |
 
 Pricing data is embedded and updated periodically. Actual costs may vary.
 
@@ -135,38 +149,57 @@ Pricing data is embedded and updated periodically. Actual costs may vary.
 bettercue/
 ├── package.json
 ├── bun.lock
-├── cli/                          ← @bettercue/cli
-│   ├── cli.ts                    ← entry point
+├── bunfig.toml                    ← Bun config (isolated linker, deps policy)
+├── cli/                           ← @bettercue/cli
+│   ├── cli.ts                     ← entry point
 │   ├── core/
-│   │   ├── config.ts             ← defaults, constants, getOllamaBaseUrl
-│   │   ├── keychain.ts           ← macOS Keychain via `security` CLI
-│   │   ├── modelCache.ts         ← JSON file cache (~/.bettercue/models-cache.json)
-│   │   ├── optimise.ts           ← wizard: input, choose, optimize, output
-│   │   ├── persistence.ts        ← CLI state persistence (~/.bettercue/cli-config.json)
-│   │   └── ...test.ts            ← bun:test suites
+│   │   ├── config.ts              ← defaults, constants, getOllamaBaseUrl
+│   │   ├── keychain.ts            ← macOS Keychain via `security` CLI
+│   │   ├── modelCache.ts          ← JSON file cache (~/.bettercue/models-cache.json)
+│   │   ├── multilineInput.ts      ← multi-line terminal input component
+│   │   ├── optimise.ts            ← wizard: input, choose, optimize, output
+│   │   ├── persistence.ts         ← CLI state persistence (~/.bettercue/cli-config.json)
+│   ├── env.d.ts
 │   ├── package.json
 │   └── tsconfig.json
-└── shared/                       ← Shared by consumers (CLI, API)
-    ├── ollama/
-    │   ├── client.ts             ← Ollama /api/generate (streaming), /api/tags
-    │   └── index.ts
-    ├── providers/
-    │   ├── catalog.ts            ← Provider metadata (displayName, defaultModel, requiresApiKey)
-    │   ├── clients/              ← Provider-specific API implementations
-    │   │   ├── anthropic.ts
-    │   │   ├── google.ts
-    │   │   ├── ollama.ts
-    │   │   └── openai.ts
-    │   ├── index.ts              ← optimizeWithProvider, listProviderModels, registry
-    │   ├── pricing.ts            ← Per-model pricing tables
-    │   ├── prompts.ts            ← System prompts per preset
-    │   └── types.ts              ← CoreProviderId, OptimizeRequest/Response, etc.
-    ├── questions/
-    │   ├── enhance.ts            ← buildEnhancedPrompt
-    │   ├── index.ts
-    │   ├── parse.ts              ← parseQuestionsResponse
-    │   ├── systemPrompt.ts       ← QUESTIONS_SYSTEM_PROMPT
-    │   └── types.ts              ← Question type
-    └── tokens/
-        └── estimator.ts          ← heuristicTokens
+├── shared/                        ← Shared by consumers (CLI, API)
+│   ├── ollama/
+│   │   ├── client.ts              ← Ollama /api/generate (streaming), /api/tags
+│   │   └── index.ts
+│   ├── providers/
+│   │   ├── catalog.ts             ← Provider metadata (displayName, defaultModel, requiresApiKey)
+│   │   ├── clients/               ← Provider-specific API implementations
+│   │   │   ├── anthropic.ts
+│   │   │   ├── google.ts
+│   │   │   ├── ollama.ts
+│   │   │   └── openai.ts
+│   │   ├── index.ts               ← optimizeWithProvider, listProviderModels, registry
+│   │   ├── pricing.ts             ← Per-model pricing tables
+│   │   ├── prompts.ts             ← System prompts per preset
+│   │   └── types.ts               ← CoreProviderId, OptimizeRequest/Response, etc.
+│   ├── questions/
+│   │   ├── enhance.ts             ← buildEnhancedPrompt
+│   │   ├── index.ts
+│   │   ├── parse.ts               ← parseQuestionsResponse
+│   │   ├── systemPrompt.ts        ← QUESTIONS_SYSTEM_PROMPT
+│   │   └── types.ts               ← Question type
+│   └── tokens/
+│       └── estimator.ts           ← heuristicTokens
+└── tests/                         ← All test suites (bun:test)
+    ├── cli/
+    │   └── core/
+    │       ├── modelCache.test.ts
+    │       └── optimise.test.ts
+    └── shared/
+        ├── ollama/
+        │   └── ollama.test.ts
+        ├── providers/
+        │   ├── index.test.ts
+        │   ├── pricing.test.ts
+        │   └── prompts.test.ts
+        ├── questions/
+        │   ├── enhance.test.ts
+        │   └── parse.test.ts
+        └── tokens/
+            └── estimator.test.ts
 ```
