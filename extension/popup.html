@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>bettercue</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+
+  <div class="app">
+
+    <!-- ─── Ambient glow ─── -->
+    <div class="orb"></div>
+
+    <!-- ─── Header ─── -->
+    <header class="header">
+      <div class="header-brand">
+        <span class="header-logo">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <rect x="2" y="2" width="7" height="7" rx="1.5" fill="#06b6d4"/>
+            <rect x="11" y="2" width="7" height="7" rx="1.5" fill="#06b6d4"/>
+            <rect x="2" y="11" width="7" height="7" rx="1.5" fill="#06b6d4"/>
+            <rect x="11" y="11" width="7" height="7" rx="1.5" fill="#06b6d4"/>
+          </svg>
+        </span>
+        <span class="header-title">bettercue</span>
+        <span class="header-badge">v0.1</span>
+      </div>
+      <p class="header-tagline">prompt optimizer</p>
+    </header>
+
+    <!-- ─── Input section ─── -->
+    <section class="section">
+      <div class="section-label">
+        <span>Your prompt</span>
+        <span class="token-count" id="tokenCount">0 tokens</span>
+      </div>
+      <div class="input-wrap">
+        <textarea
+          id="promptInput"
+          class="input"
+          placeholder="Paste or type your prompt here…"
+          rows="5"
+          spellcheck="false"
+        ></textarea>
+        <div class="input-glow"></div>
+      </div>
+    </section>
+
+    <!-- ─── Controls ─── -->
+    <section class="section section--controls">
+      <div class="control-row">
+        <div class="control-group">
+          <label class="control-label" for="providerSelect">Provider</label>
+          <div class="select-wrap">
+            <select id="providerSelect" class="select">
+              <option value="ollama">Ollama</option>
+              <option value="openai">OpenAI</option>
+              <option value="anthropic">Anthropic</option>
+              <option value="google">Google Gemini</option>
+            </select>
+            <span class="select-arrow">
+              <svg width="10" height="6" viewBox="0 0 10 6" fill="none">
+                <path d="M1 1L5 5L9 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </span>
+          </div>
+        </div>
+        <div class="control-group">
+          <label class="control-label" for="presetSelect">Style</label>
+          <div class="select-wrap">
+            <select id="presetSelect" class="select">
+              <option value="">Default</option>
+              <option value="concise">Concise</option>
+              <option value="precision">Precision</option>
+              <option value="creative">Creative</option>
+            </select>
+            <span class="select-arrow">
+              <svg width="10" height="6" viewBox="0 0 10 6" fill="none">
+                <path d="M1 1L5 5L9 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── Optimize button ─── -->
+    <button class="btn" id="optimizeBtn">
+      <span class="btn-shimmer"></span>
+      <span class="btn-content">
+        <svg class="btn-icon" width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M8 1V15M1 8H15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <circle cx="8" cy="8" r="3" stroke="currentColor" stroke-width="1.5"/>
+        </svg>
+        Optimize
+      </span>
+    </button>
+
+    <!-- ─── Output section ─── -->
+    <section class="section section--output" id="outputSection" style="display:none">
+      <div class="section-label">
+        <span>Optimized prompt</span>
+        <button class="copy-btn" id="copyBtn" title="Copy to clipboard">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <rect x="4.5" y="4.5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.2"/>
+            <path d="M10 4.5V3a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h1.5" stroke="currentColor" stroke-width="1.2"/>
+          </svg>
+        </button>
+      </div>
+      <div class="output-wrap">
+        <div class="output" id="outputContent"></div>
+        <div class="output-glow"></div>
+      </div>
+    </section>
+
+    <!-- ─── Status bar ─── -->
+    <div class="status-bar" id="statusBar">
+      <span class="status-dot"></span>
+      <span class="status-text" id="statusText">Ready</span>
+    </div>
+
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

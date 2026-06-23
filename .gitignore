@@ -15,6 +15,7 @@ build/
 .vite/
 .bun-cache/
 .cache/
+.agents/
 .eslintcache
 .prettiercache
 .stylelintcache

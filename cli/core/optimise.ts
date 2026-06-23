@@ -2,6 +2,7 @@ import chalk from "chalk";
 import inquirer from "inquirer";
 import search from "@inquirer/search";
 
+import { multilineInput } from "./multilineInput.ts";
 import { SYSTEM_PROMPT, getOllamaBaseUrl } from "./config.ts";
 import { clearCachedModels, loadCachedModels, saveCachedModels } from "./modelCache.ts";
 import { loadProviderKey, removeProviderKey, saveProviderKey } from "./keychain.ts";
@@ -454,13 +455,9 @@ export async function runCli(): Promise<void> {
         }
 
         // Step 3: Collect the prompt
-        const { prompt: rawPrompt } = await inquirer.prompt<{ prompt: string }>([
-            {
-                type: "editor",
-                name: "prompt",
-                message: "Enter the prompt to optimise",
-            },
-        ]);
+        const rawPrompt = await multilineInput({
+            message: "Enter the prompt to optimise",
+        });
 
         const trimmedPrompt = rawPrompt.trim();
         if (!trimmedPrompt) {

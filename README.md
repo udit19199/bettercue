@@ -2,6 +2,7 @@
 
 A multi-provider prompt optimizer for the CLI. Takes a raw prompt and rewrites
 it through an LLM (local or cloud) to be more effective, clear, and structured.
+New positioning: It organises your thoughts into a structured prompt when you want to info dump.
 
 ## Setup
 

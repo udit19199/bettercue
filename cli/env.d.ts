@@ -8,7 +8,7 @@
  */
 declare module "bun" {
   interface Env {
-    /** Base URL for Ollama API. Defaults to http://localhost:11434. */
+    /** Base URL for Ollama API. Defaults to http://127.0.0.1:11434. */
     OLLAMA_BASE_URL?: string;
 
     /** OpenAI API key. Required to use OpenAI models. */

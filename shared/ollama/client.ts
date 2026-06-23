@@ -1,6 +1,6 @@
 import { DEFAULT_SYSTEM_PROMPT } from "../providers/prompts";
 
-const DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434";
+const DEFAULT_OLLAMA_BASE_URL = "http://127.0.0.1:11434";
 
 export const DEFAULT_OLLAMA_GENERATE_URL = `${DEFAULT_OLLAMA_BASE_URL}/api/generate`;
 export const DEFAULT_OLLAMA_TAGS_URL = `${DEFAULT_OLLAMA_BASE_URL}/api/tags`;
